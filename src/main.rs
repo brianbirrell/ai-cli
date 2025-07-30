@@ -3,16 +3,38 @@ use clap::Parser;
 use reqwest::{Client};
 use serde::{Deserialize, Serialize};
 use std::{
+    fs,
     fs::File,
     io::{self, Read, Write, IsTerminal},
     path::PathBuf,
 };
 use tokio_stream::StreamExt;
 
+// Configuration structure
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct AppConfig {
+    model: String,
+    base_url: String,
+    api_key: Option<String>,
+    default_prompt: Option<String>,
+}
+
+impl AppConfig {
+    fn default() -> Self {
+        AppConfig {
+            model: "llama3".to_string(),
+            base_url: "http://localhost:11434/v1".to_string(),
+            api_key: None,
+            default_prompt: None,
+        }
+    }
+}
+
 /// OpenAI Compatible API Client
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    // Now these are options to override the default config
     /// Input file(s) to process
     #[arg(short, long)]
     files: Vec<PathBuf>,
@@ -22,12 +44,12 @@ struct Args {
     prompt: Option<String>,
 
     /// Model to use
-    #[arg(short, long, default_value = "llama3")]
-    model: String,
+    #[arg(short, long)]
+    model: Option<String>,
 
     /// Base URL for the API
-    #[arg(long, default_value = "http://localhost:11434/v1")]
-    base_url: String,
+    #[arg(long)]
+    base_url: Option<String>,
 
     /// API Key (if needed)
     #[arg(long)]
@@ -74,8 +96,11 @@ async fn main() -> Result<()> {
     let input = read_input(&args).await?;
 
     // Build the request
+    // Get the final config to determine the model string
+    let config = get_final_config(&args).await?;
+
     let request = ChatCompletionRequest {
-        model: args.model.clone(),
+        model: config.model.clone(),
         messages: vec![ChatMessage {
             role: "user".to_string(),
             content: input,
@@ -84,10 +109,78 @@ async fn main() -> Result<()> {
     };
 
     // Send the request and stream the response, passing the api_key from args
-    stream_response(&client, &args.base_url, args.api_key.as_ref(), request).await?;
+    stream_response(&client, config.base_url.as_str(), args.api_key.as_ref(), request).await?;
     println!(); // Print a newline at the end for clean output
 
     Ok(())
+}
+
+// Load and merge configuration from file and command line
+async fn get_final_config(args: &Args) -> Result<AppConfig> {
+    // First load from config file
+    let mut config = load_config()?;
+
+    // Then override with command line arguments if provided
+    if let Some(model) = &args.model {
+        config.model = model.clone();
+    }
+
+    if let Some(base_url) = &args.base_url {
+        config.base_url = base_url.clone();
+    }
+
+    if let Some(api_key) = &args.api_key {
+        config.api_key = Some(api_key.clone());
+    }
+
+    Ok(config)
+}
+
+// Load configuration from config file
+fn load_config() -> Result<AppConfig> {
+    let config_dir = get_config_dir()?;
+    let config_path = config_dir.join("config.toml");
+
+    if !config_path.exists() {
+        // Create default config if file doesn't exist
+        create_default_config(&config_dir)?;
+        return Ok(AppConfig::default());
+    }
+
+    // Read existing config file
+    let config_contents = fs::read_to_string(&config_path)
+        .context(format!("Failed to read config file: {}", config_path.display()))?;
+
+    let config: AppConfig = toml::from_str(&config_contents)
+        .context("Failed to parse config file as TOML")?;
+
+    Ok(config)
+}
+
+// Create default config directory and file if they don't exist
+fn create_default_config(config_dir: &PathBuf) -> Result<()> {
+    // Create directory if it doesn't exist
+    fs::create_dir_all(config_dir)
+        .context("Failed to create config directory")?;
+
+    // Create default config file
+    let default_config = AppConfig::default();
+    let toml_config = toml::to_string(&default_config)
+        .context("Failed to serialize default config")?;
+
+    fs::write(config_dir.join("config.toml"), toml_config)
+        .context("Failed to write default config file")?;
+
+    Ok(())
+}
+
+// Get or create config directory
+fn get_config_dir() -> Result<PathBuf> {
+    let home_dir = dirs::home_dir()
+        .ok_or(anyhow::anyhow!("Could not find home directory"))?;
+
+    let config_dir = home_dir.join(".config").join("ai-cli");
+    Ok(config_dir)
 }
 
 async fn read_input(args: &Args) -> Result<String> {
