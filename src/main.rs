@@ -248,32 +248,32 @@ async fn stream_response(
         .with_context(|| String::from("Failed to send request"))?
         .bytes_stream();
 
-    let mut buffer = String::new();
+    let mut incomplete = String::new();
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.with_context(|| String::from("Failed to read response chunk"))?;
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
-        buffer.push_str(text);
 
-        // Try to parse the JSON lines
-        if let Ok(response) = process_response_chunks(&buffer) {
-            let first_choice_finish_reason = response.choices.first().and_then(|choice| choice.finish_reason.clone());
-            if !response.choices.is_empty() {
-                for choice in &response.choices {
-                    if let Some(content) = choice.delta.content.as_ref() {
-                        print!("{}", content);
-                        io::stdout().flush()?;
+        incomplete.push_str(text);
+
+        // Process complete lines only
+        while let Some(pos) = incomplete.find('\n') {
+            let line = incomplete[..pos].trim();
+            if line.starts_with("data: ") && !line.starts_with("data: [DONE]") {
+                let data = &line[6..];
+                if !data.is_empty() {
+                    if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(data) {
+                        for choice in &response.choices {
+                            if let Some(content) = choice.delta.content.as_ref() {
+                                print!("{}", content);
+                                io::stdout().flush()?;
+                            }
+                        }
                     }
                 }
             }
-
-            // Reset the buffer if we've processed everything
-            if let Some(finish_reason) = first_choice_finish_reason {
-                if !finish_reason.is_empty() {
-                    buffer.clear();
-                }
-            }
+            incomplete = incomplete[pos + 1..].to_string();
         }
     }
 
