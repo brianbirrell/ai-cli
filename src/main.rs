@@ -1,13 +1,13 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use reqwest::{Client, StatusCode};
+use reqwest::{Client};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
-    io::{self, Read},
+    io::{self, Read, Write, IsTerminal},
     path::PathBuf,
 };
-use tokio::io::AsyncWriteExt;
+use tokio_stream::StreamExt;
 
 /// OpenAI Compatible API Client
 #[derive(Parser, Debug)]
@@ -22,11 +22,11 @@ struct Args {
     prompt: Option<String>,
 
     /// Model to use
-    #[arg(short, long, default_value = "gpt-3.5-turbo")]
+    #[arg(short, long, default_value = "llama3")]
     model: String,
 
     /// Base URL for the API
-    #[arg(long, default_value = "https://api.openai.com/v1")]
+    #[arg(long, default_value = "http://localhost:11434/v1")]
     base_url: String,
 
     /// API Key (if needed)
@@ -59,7 +59,7 @@ struct CompletionChoice {
     finish_reason: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct ChoiceDelta {
     content: Option<String>,
 }
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
 
     // Build the request
     let request = ChatCompletionRequest {
-        model: args.model,
+        model: args.model.clone(),
         messages: vec![ChatMessage {
             role: "user".to_string(),
             content: input,
@@ -83,8 +83,8 @@ async fn main() -> Result<()> {
         stream: true,
     };
 
-    // Send the request and stream the response
-    stream_response(&client, &args.base_url, request).await?;
+    // Send the request and stream the response, passing the api_key from args
+    stream_response(&client, &args.base_url, args.api_key.as_ref(), request).await?;
     println!(); // Print a newline at the end for clean output
 
     Ok(())
@@ -110,12 +110,12 @@ async fn read_input(args: &Args) -> Result<String> {
         io::stdout().flush()?;
         io::stdin()
             .read_to_string(&mut input)
-            .with_context("Failed to read from stdin")?;
+            .with_context(|| String::from("Failed to read from stdin"))?;
     } else {
         // Else read from stdin (could be pipe)
         io::stdin()
             .read_to_string(&mut input)
-            .with_context("Failed to read from stdin")?;
+            .with_context(|| String::from("Failed to read from stdin"))?;
     }
 
     // Add prompt if provided
@@ -126,7 +126,12 @@ async fn read_input(args: &Args) -> Result<String> {
     Ok(input)
 }
 
-async fn stream_response(client: &Client, base_url: &str, request: ChatCompletionRequest) -> Result<()> {
+async fn stream_response(
+    client: &Client,
+    base_url: &str,
+    api_key: Option<&String>,
+    request: ChatCompletionRequest,
+) -> Result<()> {
     // Construct the full URL
     let url = if base_url.ends_with('/') {
         format!("{}/chat/completions", base_url.trim_end_matches('/'))
@@ -139,7 +144,7 @@ async fn stream_response(client: &Client, base_url: &str, request: ChatCompletio
         .post(&url)
         .json(&request);
 
-    if let Some(api_key) = request.api_key.as_ref() {
+    if let Some(api_key) = api_key {
         request_builder = request_builder
             .header("Authorization", format!("Bearer {}", api_key));
     }
@@ -147,22 +152,23 @@ async fn stream_response(client: &Client, base_url: &str, request: ChatCompletio
     let mut stream = request_builder
         .send()
         .await
-        .with_context("Failed to send request")?
+        .with_context(|| String::from("Failed to send request"))?
         .bytes_stream();
 
     let mut buffer = String::new();
 
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.with_context("Failed to read response chunk")?;
+        let chunk = chunk.with_context(|| String::from("Failed to read response chunk"))?;
         let text = std::str::from_utf8(&chunk)
-            .with_context("Failed to decode response as UTF-8")?;
+            .with_context(|| String::from("Failed to decode response as UTF-8"))?;
         buffer.push_str(text);
 
         // Try to parse the JSON lines
         if let Ok(response) = process_response_chunks(&buffer) {
-            if let Some(choices) = response.into_choices() {
-                for choice in choices {
-                    if let Some(content) = choice.delta.and_then(|d| d.content) {
+            let first_choice_finish_reason = response.choices.first().and_then(|choice| choice.finish_reason.clone());
+            if !response.choices.is_empty() {
+                for choice in &response.choices {
+                    if let Some(content) = choice.delta.content.as_ref() {
                         print!("{}", content);
                         io::stdout().flush()?;
                     }
@@ -170,8 +176,8 @@ async fn stream_response(client: &Client, base_url: &str, request: ChatCompletio
             }
 
             // Reset the buffer if we've processed everything
-            if let Some(choice) = response.first_choice() {
-                if choice.finish_reason.is_some() {
+            if let Some(finish_reason) = first_choice_finish_reason {
+                if !finish_reason.is_empty() {
                     buffer.clear();
                 }
             }
@@ -194,11 +200,10 @@ fn process_response_chunks(buffer: &str) -> Result<ChatCompletionResponse> {
             continue;
         }
 
-        if let Ok(data) = line.trim_start_matches("data: ").to_string() {
-            if !data.is_empty() {
-                if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(&data) {
-                    responses.push(response);
-                }
+        let data = line.trim_start_matches("data: ").to_string();
+        if !data.is_empty() {
+            if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(&data) {
+                responses.push(response);
             }
         }
     }
@@ -214,21 +219,6 @@ fn process_response_chunks(buffer: &str) -> Result<ChatCompletionResponse> {
     }
 }
 
-// Helper methods for ChatCompletionResponse
-impl ChatCompletionResponse {
-    fn into_choices(self) -> Option<Vec<CompletionChoice>> {
-        if self.choices.is_empty() {
-            None
-        } else {
-            Some(self.choices)
-        }
-    }
-
-    fn first_choice(&self) -> Option<&CompletionChoice> {
-        self.choices.first()
-    }
-}
-
 // Helper function to concatenate responses
 fn concat_responses(mut responses: Vec<ChatCompletionResponse>) -> ChatCompletionResponse {
     if responses.is_empty() {
@@ -238,7 +228,7 @@ fn concat_responses(mut responses: Vec<ChatCompletionResponse>) -> ChatCompletio
     }
 
     // Take the first response
-    let first = responses.remove(0);
+    let mut first = responses.remove(0);
 
     // All other choices should be combined into the first one
     for response in responses {
@@ -247,19 +237,17 @@ fn concat_responses(mut responses: Vec<ChatCompletionResponse>) -> ChatCompletio
         }
 
         let last_choice_index = first.choices.len() - 1;
-        if last_choice_index >= 0 {
-            // Merge the delta content
-            if let Some(response_delta) = response.choices[0].delta.clone() {
-                // This is a simplified merging strategy
-                // In a real implementation, you'd need to handle this more carefully
-                if let Some(content) = response_delta.content {
-                    if let Some(first_choice) = first.choices.get_mut(last_choice_index) {
-                        if let Some(first_content) = first_choice.delta.content.as_mut() {
-                            first_content.push_str(&content);
-                        } else {
-                            first_choice.delta.content = Some(content);
-                        }
-                    }
+
+        // Merge the delta content
+        let response_delta = response.choices[0].delta.clone();
+        // This is a simplified merging strategy
+        // In a real implementation, you'd need to handle this more carefully
+        if let Some(content) = response_delta.content {
+            if let Some(first_choice) = first.choices.get_mut(last_choice_index) {
+                if let Some(first_content) = first_choice.delta.content.as_mut() {
+                    first_content.push_str(&content);
+                } else {
+                    first_choice.delta.content = Some(content);
                 }
             }
         }

@@ -13,3 +13,5 @@ futures = "0.3"
 anyhow = "1.0"
 tempfile = "3.3"  # For testing
 mockito = "1.0"   # For testing
+tokio-stream = "0.1.17"
+futures-util = "0.3.31"
