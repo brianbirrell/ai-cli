@@ -1,0 +1,39 @@
+name: Build and Archive Rust Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Optional: allows manual triggering
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Build project
+      run: cargo build --release
+
+    - name: Create archive
+      run: |
+        mkdir -p artifacts
+        cp target/release/ai-cli artifacts/
+        cd artifacts
+        tar -czf ../${{ github.event.release.tag_name }}.tar.gz *
+      shell: bash
+
+    - name: Upload archive to release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ github.event.release.tag_name }}.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
