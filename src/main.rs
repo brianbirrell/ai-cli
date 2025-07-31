@@ -78,7 +78,6 @@ struct ChatCompletionResponse {
 #[derive(Deserialize)]
 struct CompletionChoice {
     delta: ChoiceDelta,
-    finish_reason: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -278,73 +277,4 @@ async fn stream_response(
     }
 
     Ok(())
-}
-
-// Helper function to process response chunks
-fn process_response_chunks(buffer: &str) -> Result<ChatCompletionResponse> {
-    let mut responses = vec![];
-    let lines: Vec<&str> = buffer.lines().collect();
-
-    for line in lines {
-        if line.trim().is_empty()
-            || line.starts_with("data: [DONE]")
-            || !line.starts_with("data: ")
-        {
-            continue;
-        }
-
-        let data = line.trim_start_matches("data: ").to_string();
-        if !data.is_empty() {
-            if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(&data) {
-                responses.push(response);
-            }
-        }
-    }
-
-    if responses.is_empty() {
-        anyhow::bail!("No valid response chunks found in buffer");
-    }
-
-    if responses.len() == 1 {
-        Ok(responses.into_iter().next().unwrap())
-    } else {
-        Ok(concat_responses(responses))
-    }
-}
-
-// Helper function to concatenate responses
-fn concat_responses(mut responses: Vec<ChatCompletionResponse>) -> ChatCompletionResponse {
-    if responses.is_empty() {
-        return ChatCompletionResponse {
-            choices: vec![],
-        };
-    }
-
-    // Take the first response
-    let mut first = responses.remove(0);
-
-    // All other choices should be combined into the first one
-    for response in responses {
-        if response.choices.is_empty() {
-            continue;
-        }
-
-        let last_choice_index = first.choices.len() - 1;
-
-        // Merge the delta content
-        let response_delta = response.choices[0].delta.clone();
-        // This is a simplified merging strategy
-        // In a real implementation, you'd need to handle this more carefully
-        if let Some(content) = response_delta.content {
-            if let Some(first_choice) = first.choices.get_mut(last_choice_index) {
-                if let Some(first_content) = first_choice.delta.content.as_mut() {
-                    first_content.push_str(&content);
-                } else {
-                    first_choice.delta.content = Some(content);
-                }
-            }
-        }
-    }
-
-    first
 }
