@@ -9,7 +9,7 @@ use std::{
     path::PathBuf,
 };
 use tokio_stream::StreamExt;
-use log::{info, debug, warn, error};
+use log::{info, debug};
 
 // Configuration structure
 #[derive(Debug, Serialize, Deserialize, Default)]
