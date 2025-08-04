@@ -17,7 +17,7 @@ const GIT_COMMIT_HASH_SHORT: &str = env!("GIT_COMMIT_HASH_SHORT", "unknown");
 const GIT_DIRTY: &str = env!("GIT_DIRTY", "unknown");
 const BUILD_TIME: &str = env!("BUILD_TIME", "unknown");
 
-fn print_version() {
+pub fn print_version() {
     println!("ai-cli version {}", env!("CARGO_PKG_VERSION"));
     println!("Commit: {}{}", GIT_COMMIT_HASH_SHORT, if GIT_DIRTY == "dirty" { "-dirty" } else { "" });
     println!("Full commit: {}", GIT_COMMIT_HASH);
@@ -47,7 +47,7 @@ impl AppConfig {
 /// OpenAI Compatible API Client
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None)]
-struct Args {
+pub struct Args {
     // Now these are options to override the default config
     /// Input file(s) to process
     #[arg(short, long)]
@@ -108,7 +108,7 @@ struct ChoiceDelta {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+pub async fn main() -> Result<()> {
     let args = Args::parse();
     
     // Handle version flag
@@ -393,3 +393,6 @@ async fn stream_response(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod unit_tests;
