@@ -6,7 +6,8 @@ Security:
   - TBD
 
 Features:
-  - TBD
+  - Added version information command line arg -> [#5](https://github.com/brianbirrell/ai-cli/issues/5)
+  - Added verbose output command line arg -> [#4](https://github.com/brianbirrell/ai-cli/issues/4)
 
 Fix:
   - Fixed authentication issue the API key from config file were ignored -> [#8](https://github.com/brianbirrell/ai-cli/issues/8)
