@@ -20,7 +20,12 @@ fn main() {
         .args(&["diff-index", "--quiet", "HEAD", "--"])
         .output()
         .map(|output| !output.status.success())
-        .unwrap_or(false);
+        .unwrap_or(false)
+        || Command::new("git")
+            .args(&["ls-files", "--others", "--exclude-standard"])
+            .output()
+            .map(|output| !output.stdout.is_empty())
+            .unwrap_or(false);
 
     // Get the build timestamp
     let build_time = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
