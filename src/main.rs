@@ -304,11 +304,23 @@ async fn stream_response(
     }
 
     info!("Sending streaming request to API");
-    let mut stream = request_builder
+    let response = request_builder
         .send()
         .await
-        .with_context(|| String::from("Failed to send request"))?
-        .bytes_stream();
+        .with_context(|| String::from("Failed to send request"))?;
+    
+    // Check and log the response status
+    let status = response.status();
+    info!("API response status: {} ({})", status.as_u16(), status.canonical_reason().unwrap_or("Unknown"));
+    
+    if !status.is_success() {
+        let error_body = response.text().await
+            .unwrap_or_else(|_| "Unable to read error response body".to_string());
+        return Err(anyhow::anyhow!("API request failed with status {}: {}", status.as_u16(), error_body));
+    }
+    
+    debug!("API connection successful, starting to stream response");
+    let mut stream = response.bytes_stream();
 
     let mut incomplete = String::new();
     let mut chunk_count = 0;
@@ -320,6 +332,7 @@ async fn stream_response(
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
 
+        debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
         incomplete.push_str(text);
 
         // Process complete lines only
@@ -328,12 +341,18 @@ async fn stream_response(
             if line.starts_with("data: ") && !line.starts_with("data: [DONE]") {
                 let data = &line[6..];
                 if !data.is_empty() {
-                    if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(data) {
-                        for choice in &response.choices {
-                            if let Some(content) = choice.delta.content.as_ref() {
-                                print!("{}", content);
-                                io::stdout().flush()?;
+                    match serde_json::from_str::<ChatCompletionResponse>(data) {
+                        Ok(response) => {
+                            for choice in &response.choices {
+                                if let Some(content) = choice.delta.content.as_ref() {
+                                    print!("{}", content);
+                                    io::stdout().flush()?;
+                                }
                             }
+                        }
+                        Err(e) => {
+                            debug!("Failed to parse JSON response: {}", e);
+                            debug!("Raw data: {}", data);
                         }
                     }
                 }
@@ -345,5 +364,9 @@ async fn stream_response(
     }
 
     info!("Streaming completed after {} chunks", chunk_count);
+    debug!("Final incomplete buffer length: {} characters", incomplete.len());
+    if !incomplete.is_empty() {
+        debug!("Remaining incomplete data: {}", incomplete);
+    }
     Ok(())
 }
