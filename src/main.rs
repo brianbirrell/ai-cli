@@ -9,6 +9,7 @@ use std::{
     path::PathBuf,
 };
 use tokio_stream::StreamExt;
+use log::{info, debug};
 
 // Configuration structure
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -54,6 +55,10 @@ struct Args {
     /// API Key (if needed)
     #[arg(long)]
     api_key: Option<String>,
+
+    /// Enable verbose logging
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 #[derive(Serialize)]
@@ -88,15 +93,36 @@ struct ChoiceDelta {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+    
+    // Initialize logging with appropriate verbosity
+    let mut builder = env_logger::Builder::new();
+    
+    if args.verbose {
+        // In verbose mode, show debug logs and above
+        builder.filter_level(log::LevelFilter::Debug);
+        debug!("Starting AI CLI application in verbose mode");
+        debug!("Command line arguments: {:?}", args);
+    } else {
+        // In normal mode, only show warnings and errors
+        builder.filter_level(log::LevelFilter::Warn);
+    }
+    
+    builder.init();
+    
     let client = Client::builder()
         .build()?;
+    debug!("HTTP client initialized");
 
     // Read all input sources
+    info!("Reading input from files and/or stdin");
     let input = read_input(&args).await?;
+    debug!("Input length: {} characters", input.len());
 
     // Build the request
     // Get the final config to determine the model string
+    info!("Loading configuration");
     let config = get_final_config(&args).await?;
+    debug!("Using model: {}, base_url: {}", config.model, config.base_url);
 
     let request = ChatCompletionRequest {
         model: config.model.clone(),
@@ -106,32 +132,41 @@ async fn main() -> Result<()> {
         }],
         stream: true,
     };
+    debug!("Request prepared with streaming enabled");
 
     // Send the request and stream the response, passing the api_key from args
+    info!("Sending request to API");
     stream_response(&client, config.base_url.as_str(), args.api_key.as_ref(), request).await?;
     println!(); // Print a newline at the end for clean output
+    info!("Response streaming completed");
 
     Ok(())
 }
 
 // Load and merge configuration from file and command line
 async fn get_final_config(args: &Args) -> Result<AppConfig> {
+    debug!("Loading configuration from file");
     // First load from config file
     let mut config = load_config()?;
+    debug!("Base configuration loaded");
 
     // Then override with command line arguments if provided
     if let Some(model) = &args.model {
+        debug!("Overriding model with command line argument: {}", model);
         config.model = model.clone();
     }
 
     if let Some(base_url) = &args.base_url {
+        debug!("Overriding base_url with command line argument: {}", base_url);
         config.base_url = base_url.clone();
     }
 
     if let Some(api_key) = &args.api_key {
+        debug!("Using API key from command line argument");
         config.api_key = Some(api_key.clone());
     }
 
+    info!("Final configuration: model={}, base_url={}", config.model, config.base_url);
     Ok(config)
 }
 
@@ -139,25 +174,30 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
 fn load_config() -> Result<AppConfig> {
     let config_dir = get_config_dir()?;
     let config_path = config_dir.join("config.toml");
+    debug!("Config path: {}", config_path.display());
 
     if !config_path.exists() {
         // Create default config if file doesn't exist
+        info!("Config file not found, creating default configuration");
         create_default_config(&config_dir)?;
         return Ok(AppConfig::default());
     }
 
     // Read existing config file
+    info!("Reading existing config file");
     let config_contents = fs::read_to_string(&config_path)
         .context(format!("Failed to read config file: {}", config_path.display()))?;
 
     let config: AppConfig = toml::from_str(&config_contents)
         .context("Failed to parse config file as TOML")?;
 
+    debug!("Configuration loaded successfully");
     Ok(config)
 }
 
 // Create default config directory and file if they don't exist
 fn create_default_config(config_dir: &PathBuf) -> Result<()> {
+    debug!("Creating config directory: {}", config_dir.display());
     // Create directory if it doesn't exist
     fs::create_dir_all(config_dir)
         .context("Failed to create config directory")?;
@@ -167,9 +207,12 @@ fn create_default_config(config_dir: &PathBuf) -> Result<()> {
     let toml_config = toml::to_string(&default_config)
         .context("Failed to serialize default config")?;
 
-    fs::write(config_dir.join("config.toml"), toml_config)
+    let config_file_path = config_dir.join("config.toml");
+    debug!("Writing default config to: {}", config_file_path.display());
+    fs::write(config_file_path, toml_config)
         .context("Failed to write default config file")?;
 
+    info!("Default configuration created successfully");
     Ok(())
 }
 
@@ -179,6 +222,7 @@ fn get_config_dir() -> Result<PathBuf> {
         .ok_or(anyhow::anyhow!("Could not find home directory"))?;
 
     let config_dir = home_dir.join(".config").join("ai-cli");
+    debug!("Config directory: {}", config_dir.display());
     Ok(config_dir)
 }
 
@@ -186,35 +230,49 @@ async fn read_input(args: &Args) -> Result<String> {
     let mut input = String::new();
 
     // Read from files if specified
-    for file_path in &args.files {
-        let mut file = File::open(file_path)
-            .with_context(|| format!("Failed to open file: {}", file_path.display()))?;
-        let mut file_content = String::new();
-        file.read_to_string(&mut file_content)?;
-        input.push_str(&file_content);
-        input.push('\n');
+    if !args.files.is_empty() {
+        info!("Reading input from {} file(s)", args.files.len());
+        for (i, file_path) in args.files.iter().enumerate() {
+            debug!("Reading file {}: {}", i + 1, file_path.display());
+            let mut file = File::open(file_path)
+                .with_context(|| format!("Failed to open file: {}", file_path.display()))?;
+            let mut file_content = String::new();
+            file.read_to_string(&mut file_content)?;
+            input.push_str(&file_content);
+            input.push('\n');
+            debug!("File {} read successfully, content length: {}", i + 1, file_content.len());
+        }
     }
 
     // Read from stdin if not in pipe mode or if stdin is not empty
     if io::stdin().is_terminal() && args.files.is_empty() {
         // No files and stdin is tty, prompt for input
+        info!("Reading input from terminal (interactive mode)");
         io::stdout().write_all(b"Enter your input (Ctrl+D to finish):\n")?;
         io::stdout().flush()?;
         io::stdin()
             .read_to_string(&mut input)
             .with_context(|| String::from("Failed to read from stdin"))?;
+        debug!("Interactive input received, length: {}", input.len());
+    } else if !args.files.is_empty() {
+        // Files were provided, skip stdin
+        debug!("Skipping stdin as files were provided");
     } else {
         // Else read from stdin (could be pipe)
+        info!("Reading input from stdin (pipe mode)");
         io::stdin()
             .read_to_string(&mut input)
             .with_context(|| String::from("Failed to read from stdin"))?;
+        debug!("Pipe input received, length: {}", input.len());
     }
 
     // Add prompt if provided
     if let Some(prompt) = &args.prompt {
+        debug!("Adding prompt to input: {}", prompt);
         input = format!("{} {}\n{}", "Prompt:", prompt, input);
     }
 
+    info!("Total input length: {} characters", input.len());
     Ok(input)
 }
 
@@ -230,6 +288,7 @@ async fn stream_response(
     } else {
         format!("{}/chat/completions", base_url)
     };
+    debug!("API endpoint: {}", url);
 
     // Add API key to headers if provided
     let mut request_builder = client
@@ -237,23 +296,43 @@ async fn stream_response(
         .json(&request);
 
     if let Some(api_key) = api_key {
+        debug!("Adding API key to request headers");
         request_builder = request_builder
             .header("Authorization", format!("Bearer {}", api_key));
+    } else {
+        debug!("No API key provided");
     }
 
-    let mut stream = request_builder
+    info!("Sending streaming request to API");
+    let response = request_builder
         .send()
         .await
-        .with_context(|| String::from("Failed to send request"))?
-        .bytes_stream();
+        .with_context(|| String::from("Failed to send request"))?;
+    
+    // Check and log the response status
+    let status = response.status();
+    info!("API response status: {} ({})", status.as_u16(), status.canonical_reason().unwrap_or("Unknown"));
+    
+    if !status.is_success() {
+        let error_body = response.text().await
+            .unwrap_or_else(|_| "Unable to read error response body".to_string());
+        return Err(anyhow::anyhow!("API request failed with status {}: {}", status.as_u16(), error_body));
+    }
+    
+    debug!("API connection successful, starting to stream response");
+    let mut stream = response.bytes_stream();
 
     let mut incomplete = String::new();
+    let mut chunk_count = 0;
 
+    info!("Starting to stream response");
     while let Some(chunk) = stream.next().await {
+        chunk_count += 1;
         let chunk = chunk.with_context(|| String::from("Failed to read response chunk"))?;
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
 
+        debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
         incomplete.push_str(text);
 
         // Process complete lines only
@@ -262,19 +341,32 @@ async fn stream_response(
             if line.starts_with("data: ") && !line.starts_with("data: [DONE]") {
                 let data = &line[6..];
                 if !data.is_empty() {
-                    if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(data) {
-                        for choice in &response.choices {
-                            if let Some(content) = choice.delta.content.as_ref() {
-                                print!("{}", content);
-                                io::stdout().flush()?;
+                    match serde_json::from_str::<ChatCompletionResponse>(data) {
+                        Ok(response) => {
+                            for choice in &response.choices {
+                                if let Some(content) = choice.delta.content.as_ref() {
+                                    print!("{}", content);
+                                    io::stdout().flush()?;
+                                }
                             }
+                        }
+                        Err(e) => {
+                            debug!("Failed to parse JSON response: {}", e);
+                            debug!("Raw data: {}", data);
                         }
                     }
                 }
+            } else if line.starts_with("data: [DONE]") {
+                debug!("Received end-of-stream marker");
             }
             incomplete = incomplete[pos + 1..].to_string();
         }
     }
 
+    info!("Streaming completed after {} chunks", chunk_count);
+    debug!("Final incomplete buffer length: {} characters", incomplete.len());
+    if !incomplete.is_empty() {
+        debug!("Remaining incomplete data: {}", incomplete);
+    }
     Ok(())
 }
