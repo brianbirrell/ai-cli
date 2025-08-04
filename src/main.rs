@@ -94,19 +94,20 @@ struct ChoiceDelta {
 async fn main() -> Result<()> {
     let args = Args::parse();
     
-    // Initialize logging
-    let log_level = if args.verbose {
-        log::LevelFilter::Debug
+    // Initialize logging with appropriate verbosity
+    let mut builder = env_logger::Builder::new();
+    
+    if args.verbose {
+        // In verbose mode, show debug logs and above
+        builder.filter_level(log::LevelFilter::Debug);
+        debug!("Starting AI CLI application in verbose mode");
+        debug!("Command line arguments: {:?}", args);
     } else {
-        log::LevelFilter::Info
-    };
+        // In normal mode, only show warnings and errors
+        builder.filter_level(log::LevelFilter::Warn);
+    }
     
-    env_logger::Builder::new()
-        .filter_level(log_level)
-        .init();
-    
-    info!("Starting AI CLI application");
-    debug!("Command line arguments: {:?}", args);
+    builder.init();
     
     let client = Client::builder()
         .build()?;
