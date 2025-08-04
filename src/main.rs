@@ -320,7 +320,6 @@ async fn stream_response(
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
 
-        debug!("Received chunk {} ({} bytes)", chunk_count, chunk.len());
         incomplete.push_str(text);
 
         // Process complete lines only
@@ -332,7 +331,6 @@ async fn stream_response(
                     if let Ok(response) = serde_json::from_str::<ChatCompletionResponse>(data) {
                         for choice in &response.choices {
                             if let Some(content) = choice.delta.content.as_ref() {
-                                debug!("Outputting content: {}", content);
                                 print!("{}", content);
                                 io::stdout().flush()?;
                             }
