@@ -11,6 +11,19 @@ use std::{
 use tokio_stream::StreamExt;
 use log::{info, debug};
 
+// Build-time constants
+const GIT_COMMIT_HASH: &str = env!("GIT_COMMIT_HASH", "unknown");
+const GIT_COMMIT_HASH_SHORT: &str = env!("GIT_COMMIT_HASH_SHORT", "unknown");
+const GIT_DIRTY: &str = env!("GIT_DIRTY", "unknown");
+const BUILD_TIME: &str = env!("BUILD_TIME", "unknown");
+
+pub fn print_version() {
+    println!("ai-cli version {}", env!("CARGO_PKG_VERSION"));
+    println!("Commit: {}{}", GIT_COMMIT_HASH_SHORT, if GIT_DIRTY == "dirty" { "-dirty" } else { "" });
+    println!("Full commit: {}", GIT_COMMIT_HASH);
+    println!("Built: {}", BUILD_TIME);
+}
+
 // Configuration structure
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AppConfig {
@@ -33,8 +46,8 @@ impl AppConfig {
 
 /// OpenAI Compatible API Client
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
+#[command(author, about, long_about = None)]
+pub struct Args {
     // Now these are options to override the default config
     /// Input file(s) to process
     #[arg(short, long)]
@@ -59,6 +72,10 @@ struct Args {
     /// Enable verbose logging
     #[arg(short, long)]
     verbose: bool,
+
+    /// Show version information
+    #[arg(long)]
+    version: bool,
 }
 
 #[derive(Serialize)]
@@ -91,8 +108,14 @@ struct ChoiceDelta {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+pub async fn main() -> Result<()> {
     let args = Args::parse();
+    
+    // Handle version flag
+    if args.version {
+        print_version();
+        return Ok(());
+    }
     
     // Initialize logging with appropriate verbosity
     let mut builder = env_logger::Builder::new();
@@ -370,3 +393,6 @@ async fn stream_response(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod unit_tests;
