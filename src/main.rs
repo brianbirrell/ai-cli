@@ -157,9 +157,9 @@ pub async fn main() -> Result<()> {
     };
     debug!("Request prepared with streaming enabled");
 
-    // Send the request and stream the response, passing the api_key from args
+    // Send the request and stream the response, passing the api_key from config or args
     info!("Sending request to API");
-    stream_response(&client, config.base_url.as_str(), args.api_key.as_ref(), request).await?;
+    stream_response(&client, config.base_url.as_str(), config.api_key.as_ref(), request).await?;
     println!(); // Print a newline at the end for clean output
     info!("Response streaming completed");
 
@@ -190,6 +190,11 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
     }
 
     info!("Final configuration: model={}, base_url={}", config.model, config.base_url);
+    if config.api_key.is_some() {
+        debug!("API key is configured");
+    } else {
+        debug!("No API key configured");
+    }
     Ok(config)
 }
 
@@ -323,7 +328,7 @@ async fn stream_response(
         request_builder = request_builder
             .header("Authorization", format!("Bearer {}", api_key));
     } else {
-        debug!("No API key provided");
+        debug!("No API key provided - this may cause authentication errors if the API requires authentication");
     }
 
     info!("Sending streaming request to API");
