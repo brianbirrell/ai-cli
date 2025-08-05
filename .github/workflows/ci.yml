@@ -5,6 +5,7 @@ on:
     branches: [ main, development ]
   pull_request:
     branches: [ main, development ]
+  workflow_dispatch:  # Allows manual triggering
 
 env:
   CARGO_TERM_COLOR: always
@@ -25,7 +26,7 @@ jobs:
         override: true
         
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -58,7 +59,7 @@ jobs:
         override: true
         
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -77,7 +78,7 @@ jobs:
         tar -czf ../ai-cli-development-$(date +%Y%m%d-%H%M%S).tar.gz *
         
     - name: Upload development artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: development-build
         path: ai-cli-development-*.tar.gz
@@ -98,7 +99,7 @@ jobs:
         override: true
         
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -117,7 +118,7 @@ jobs:
         tar -czf ../ai-cli-release-$(date +%Y%m%d-%H%M%S).tar.gz *
         
     - name: Upload release artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: release-build
         path: ai-cli-release-*.tar.gz 
