@@ -14,6 +14,7 @@ jobs:
   test-development:
     name: Test Development
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
     - name: Checkout code
@@ -47,6 +48,7 @@ jobs:
     name: Build Pre-Release
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/development' && github.event_name == 'push'
+    timeout-minutes: 20
     
     steps:
     - name: Checkout code
@@ -76,6 +78,7 @@ jobs:
         COMMIT_DATE=$(git log -1 --format=%cd --date=short)
         echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
         echo "commit_date=$COMMIT_DATE" >> $GITHUB_OUTPUT
+        echo "artifact_name=development-build-$SHORT_SHA" >> $GITHUB_OUTPUT
         
     - name: Build release
       run: cargo build --release
@@ -99,7 +102,7 @@ jobs:
     - name: Upload pre-release artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: development-build-${{ steps.commit.outputs.short_sha }}
+        name: ${{ steps.commit.outputs.artifact_name }}
         path: |
           ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz
           ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip
@@ -110,6 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/development' && github.event_name == 'push'
     needs: build-pre-release
+    timeout-minutes: 10
     
     steps:
     - name: Checkout code
@@ -124,12 +128,27 @@ jobs:
         COMMIT_DATE=$(git log -1 --format=%cd --date=short)
         echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
         echo "commit_date=$COMMIT_DATE" >> $GITHUB_OUTPUT
+        echo "artifact_name=development-build-$SHORT_SHA" >> $GITHUB_OUTPUT
         
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
-        name: development-build-${{ steps.commit.outputs.short_sha }}
+        name: ${{ steps.commit.outputs.artifact_name }}
         path: artifacts/
+        
+    - name: Verify artifacts
+      run: |
+        echo "Checking for artifacts in artifacts/ directory..."
+        ls -la artifacts/
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz" ]; then
+          echo "❌ Expected tar.gz artifact not found"
+          exit 1
+        fi
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip" ]; then
+          echo "❌ Expected zip artifact not found"
+          exit 1
+        fi
+        echo "✅ All expected artifacts found"
         
     - name: Create Development Release
       uses: softprops/action-gh-release@v1
@@ -146,5 +165,6 @@ jobs:
         files: artifacts/*
         draft: false
         prerelease: true
+        fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
