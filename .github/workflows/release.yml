@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed for proper versioning
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Build release
+      run: cargo build --release
+        
+    - name: Create release archives
+      run: |
+        # Create artifacts directory
+        mkdir -p artifacts
+        
+        # Copy binary
+        cp target/release/ai-cli artifacts/
+        
+        # Create tar.gz archive
+        cd artifacts
+        tar -czf ../ai-cli-${{ github.ref_name }}.tar.gz *
+        
+        # Create zip archive for Windows users
+        cd ..
+        zip -r ai-cli-${{ github.ref_name }}.zip artifacts/
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ai-cli-${{ github.ref_name }}.tar.gz
+          ai-cli-${{ github.ref_name }}.zip
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  auto-version:
+    name: Auto Version and Tag
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Generate new version
+      id: version
+      run: |
+        # Get the current version from Cargo.toml
+        CURRENT_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
+        
+        # Parse version components
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+        
+        # Increment patch version
+        NEW_PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+        
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Update Cargo.toml version
+      run: |
+        NEW_VERSION=${{ steps.version.outputs.new_version }}
+        sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+        
+    - name: Commit and push version bump
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add Cargo.toml
+        git commit -m "Bump version to ${{ steps.version.outputs.new_version }}"
+        git push
+        
+    - name: Create and push tag
+      run: |
+        git tag ${{ steps.version.outputs.new_tag }}
+        git push origin ${{ steps.version.outputs.new_tag }} 
