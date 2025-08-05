@@ -24,8 +24,8 @@ pub fn print_version() {
         GIT_COMMIT_HASH_SHORT,
         if GIT_DIRTY == "dirty" { "-dirty" } else { "" }
     );
-    println!("Full commit: {}", GIT_COMMIT_HASH);
-    println!("Built: {}", BUILD_TIME);
+    println!("Full commit: {GIT_COMMIT_HASH}");
+    println!("Built: {BUILD_TIME}");
 }
 
 // Configuration structure
@@ -128,7 +128,7 @@ pub async fn main() -> Result<()> {
         // In verbose mode, show debug logs and above
         builder.filter_level(log::LevelFilter::Debug);
         debug!("Starting AI CLI application in verbose mode");
-        debug!("Command line arguments: {:?}", args);
+        debug!("Command line arguments: {args:?}");
     } else {
         // In normal mode, only show warnings and errors
         builder.filter_level(log::LevelFilter::Warn);
@@ -187,14 +187,13 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
 
     // Then override with command line arguments if provided
     if let Some(model) = &args.model {
-        debug!("Overriding model with command line argument: {}", model);
+        debug!("Overriding model with command line argument: {model}");
         config.model = model.clone();
     }
 
     if let Some(base_url) = &args.base_url {
         debug!(
-            "Overriding base_url with command line argument: {}",
-            base_url
+            "Overriding base_url with command line argument: {base_url}"
         );
         config.base_url = base_url.clone();
     }
@@ -317,7 +316,7 @@ async fn read_input(args: &Args) -> Result<String> {
 
     // Add prompt if provided
     if let Some(prompt) = &args.prompt {
-        debug!("Adding prompt to input: {}", prompt);
+        debug!("Adding prompt to input: {prompt}");
         input = format!("{} {}\n{}", "Prompt:", prompt, input);
     }
 
@@ -335,16 +334,16 @@ async fn stream_response(
     let url = if base_url.ends_with('/') {
         format!("{}/chat/completions", base_url.trim_end_matches('/'))
     } else {
-        format!("{}/chat/completions", base_url)
+        format!("{base_url}/chat/completions")
     };
-    debug!("API endpoint: {}", url);
+    debug!("API endpoint: {url}");
 
     // Add API key to headers if provided
     let mut request_builder = client.post(&url).json(&request);
 
     if let Some(api_key) = api_key {
         debug!("Adding API key to request headers");
-        request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+        request_builder = request_builder.header("Authorization", format!("Bearer {api_key}"));
     } else {
         debug!("No API key provided - this may cause authentication errors if the API requires authentication");
     }
@@ -401,14 +400,14 @@ async fn stream_response(
                         Ok(response) => {
                             for choice in &response.choices {
                                 if let Some(content) = choice.delta.content.as_ref() {
-                                    print!("{}", content);
+                                    print!("{content}");
                                     io::stdout().flush()?;
                                 }
                             }
                         }
                         Err(e) => {
-                            debug!("Failed to parse JSON response: {}", e);
-                            debug!("Raw data: {}", data);
+                            debug!("Failed to parse JSON response: {e}");
+                            debug!("Raw data: {data}");
                         }
                     }
                 }
@@ -419,13 +418,13 @@ async fn stream_response(
         }
     }
 
-    info!("Streaming completed after {} chunks", chunk_count);
+    info!("Streaming completed after {chunk_count} chunks");
     debug!(
         "Final incomplete buffer length: {} characters",
         incomplete.len()
     );
     if !incomplete.is_empty() {
-        debug!("Remaining incomplete data: {}", incomplete);
+        debug!("Remaining incomplete data: {incomplete}");
     }
     Ok(())
 }
