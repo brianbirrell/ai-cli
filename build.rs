@@ -28,15 +28,23 @@ fn main() {
             .unwrap_or(false);
 
     // Get the build timestamp
-    let build_time = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let build_time = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S UTC")
+        .to_string();
 
     // Set the build-time constants
     println!("cargo:rustc-env=GIT_COMMIT_HASH={}", commit_hash);
-    println!("cargo:rustc-env=GIT_COMMIT_HASH_SHORT={}", commit_hash_short);
-    println!("cargo:rustc-env=GIT_DIRTY={}", if dirty { "dirty" } else { "clean" });
+    println!(
+        "cargo:rustc-env=GIT_COMMIT_HASH_SHORT={}",
+        commit_hash_short
+    );
+    println!(
+        "cargo:rustc-env=GIT_DIRTY={}",
+        if dirty { "dirty" } else { "clean" }
+    );
     println!("cargo:rustc-env=BUILD_TIME={}", build_time);
 
     // Re-run if git information changes
     println!("cargo:rerun-if-changed=.git/HEAD");
     println!("cargo:rerun-if-changed=.git/index");
-} 
+}
