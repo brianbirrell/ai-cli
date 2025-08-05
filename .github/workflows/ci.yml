@@ -47,6 +47,9 @@ jobs:
     name: Build Development Release
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/development' && github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
     
     steps:
     - name: Checkout code
@@ -87,6 +90,9 @@ jobs:
     name: Build Release
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
     
     steps:
     - name: Checkout code
