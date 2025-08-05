@@ -192,9 +192,7 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
     }
 
     if let Some(base_url) = &args.base_url {
-        debug!(
-            "Overriding base_url with command line argument: {base_url}"
-        );
+        debug!("Overriding base_url with command line argument: {base_url}");
         config.base_url = base_url.clone();
     }
 

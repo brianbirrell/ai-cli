@@ -34,9 +34,7 @@ fn main() {
 
     // Set the build-time constants
     println!("cargo:rustc-env=GIT_COMMIT_HASH={commit_hash}");
-    println!(
-        "cargo:rustc-env=GIT_COMMIT_HASH_SHORT={commit_hash_short}"
-    );
+    println!("cargo:rustc-env=GIT_COMMIT_HASH_SHORT={commit_hash_short}");
     println!(
         "cargo:rustc-env=GIT_DIRTY={}",
         if dirty { "dirty" } else { "clean" }
