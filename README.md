@@ -16,6 +16,8 @@ A command-line OpenAI-compatible API client, written in Rust, for interacting wi
 - 🐧 Designed for local or remote OpenAI-compatible endpoints.
 - 📂 Reads multiple files and combines their content as input.
 - 🔄 Integrates smoothly into shell scripts and pipelines.
+- 📊 Verbose logging for debugging and monitoring.
+- ℹ️ Version information display.
 
 ## Project like this one
 
@@ -37,6 +39,8 @@ See also: [shell_gpt](https://github.com/TheR1D/shell_gpt?tab=readme-ov-file)
 
 ## Install
 
+### Option 1: Build from source
+
 Clone the repository and build with Cargo:
 
 ```sh
@@ -47,12 +51,30 @@ cargo build --release
 
 The binary will be found at `target/release/ai-cli`.
 
+### Option 2: Download pre-built release
+
+Check the [releases page](https://github.com/brianbirrell/ai-cli/releases) for pre-built binaries.
+
 # Usage
 
 ```sh
+# Basic usage with prompt
 ai-cli -p "Explain quantum computing in simple terms"
+
+# Using stdin
 cat myfile.txt | ai-cli -m llama3 -p "What is in this file?"
+
+# Multiple files
 ai-cli -f notes.txt -f summary.txt -p "Summarize these notes"
+
+# Verbose output for debugging
+ai-cli -v -p "Test prompt"
+
+# Show version information
+ai-cli --version
+
+# Custom API endpoint
+ai-cli --base-url "https://api.openai.com/v1" --api-key "your-key" -p "Hello"
 ```
 
 **Command line options:**  
@@ -63,8 +85,22 @@ All options are optional _except_ for `-p, --prompt`, which is required.
 - `-f, --files <file>` (optional): One or more files to send as input
 - `--base-url <url>` (optional): API endpoint (default: http://localhost:11434/v1)
 - `--api-key <key>` (optional): API key for authentication, if needed
+- `-v, --verbose` (optional): Enable verbose logging
+- `--version` (optional): Show version information
 
-You can also set defaults in `~/.config/ai-cli/config.toml`.
+## Configuration
+
+You can set defaults in `~/.config/ai-cli/config.toml`. The config file is automatically created on first run.
+
+Example config file:
+```toml
+model = "llama3"
+base_url = "http://localhost:11434/v1"
+api_key = "your-api-key-here"
+default_prompt = "You are a helpful assistant."
+```
+
+Command-line arguments will override config file values.
 
 # Contributing
 
