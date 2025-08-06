@@ -1,0 +1,173 @@
+name: Development Build
+
+on:
+  push:
+    branches: [ development ]
+  pull_request:
+    branches: [ development ]
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-development:
+    name: Test Development
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Build
+      run: cargo build --verbose
+      
+    - name: Run tests
+      run: cargo test --verbose
+      
+    - name: Run integration tests
+      run: cargo test --test integration_tests --verbose
+
+  build-pre-release:
+    name: Build Pre-Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/development' && github.event_name == 'push'
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Get commit info
+      id: commit
+      run: |
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        COMMIT_DATE=$(git log -1 --format=%cd --date=short)
+        echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+        echo "commit_date=$COMMIT_DATE" >> $GITHUB_OUTPUT
+        echo "artifact_name=development-build-$SHORT_SHA" >> $GITHUB_OUTPUT
+        
+    - name: Build release
+      run: cargo build --release
+        
+    - name: Create pre-release archive
+      run: |
+        # Create artifacts directory
+        mkdir -p artifacts
+        
+        # Copy binary
+        cp target/release/ai-cli artifacts/
+        
+        # Create tar.gz archive with development version
+        cd artifacts
+        tar -czf ../ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz *
+        
+        # Create zip archive for Windows users
+        cd ..
+        zip -r ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip artifacts/
+        
+    - name: Upload pre-release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.commit.outputs.artifact_name }}
+        path: |
+          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz
+          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip
+        retention-days: 30
+
+  create-development-release:
+    name: Create Development Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/development' && github.event_name == 'push'
+    needs: build-pre-release
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Get commit info
+      id: commit
+      run: |
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        COMMIT_DATE=$(git log -1 --format=%cd --date=short)
+        echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+        echo "commit_date=$COMMIT_DATE" >> $GITHUB_OUTPUT
+        echo "artifact_name=development-build-$SHORT_SHA" >> $GITHUB_OUTPUT
+        
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ steps.commit.outputs.artifact_name }}
+        path: artifacts/
+        
+    - name: Verify artifacts
+      run: |
+        echo "Checking for artifacts in artifacts/ directory..."
+        ls -la artifacts/
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz" ]; then
+          echo "❌ Expected tar.gz artifact not found"
+          exit 1
+        fi
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip" ]; then
+          echo "❌ Expected zip artifact not found"
+          exit 1
+        fi
+        echo "✅ All expected artifacts found"
+        
+    - name: Create Development Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}
+        name: Development Build ${{ steps.commit.outputs.commit_date }} (${{ steps.commit.outputs.short_sha }})
+        body: |
+          Development build from commit ${{ steps.commit.outputs.short_sha }}
+          
+          **Build Date:** ${{ steps.commit.outputs.commit_date }}
+          **Commit:** ${{ steps.commit.outputs.short_sha }}
+          
+          This is a pre-release build for testing purposes.
+        files: artifacts/*
+        draft: false
+        prerelease: true
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

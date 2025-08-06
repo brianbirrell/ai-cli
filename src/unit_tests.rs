@@ -5,7 +5,7 @@ async fn test_read_empty_stdinput() {
     // This test is disabled because it tries to read from stdin
     // which causes the test to hang in CI environments
     // TODO: Implement proper stdin mocking for this test
-    
+
     // For now, we'll just test that the Args struct can be created
     let args = Args {
         files: vec![],
@@ -16,7 +16,7 @@ async fn test_read_empty_stdinput() {
         verbose: false,
         version: false,
     };
-    
+
     assert!(args.files.is_empty());
     assert!(args.prompt.is_none());
     assert!(!args.version);
@@ -56,7 +56,7 @@ async fn test_read_with_prompt() {
     // Note: This test would need proper stdin mocking to work correctly
     // For now, we'll skip the actual input reading and just test the prompt handling
     // TODO: Implement proper stdin mocking for this test
-    
+
     // The test is disabled for now due to stdin mocking complexity
     // In a real implementation, you would:
     // 1. Mock stdin input
@@ -76,12 +76,12 @@ fn test_version_output_format() {
     // Test that the print_version function can be called without panicking
     // This is a basic smoke test to ensure the function works
     print_version();
-    
+
     // We could add more comprehensive tests here that:
     // 1. Check the build-time constants are properly set
     // 2. Verify the output format matches expectations
     // 3. Test with different git states (clean/dirty)
-    
+
     // For now, we'll rely on integration tests that run the actual binary
     // with --version flag to verify the complete functionality
 }
@@ -98,9 +98,9 @@ fn test_version_flag_parsing() {
         verbose: false,
         version: true,
     };
-    
+
     assert!(args.version);
-    
+
     let args = Args {
         files: vec![],
         prompt: None,
@@ -110,6 +110,6 @@ fn test_version_flag_parsing() {
         verbose: false,
         version: false,
     };
-    
+
     assert!(!args.version);
 }

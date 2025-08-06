@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use reqwest::{Client};
+use log::{debug, info};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
     fs::File,
-    io::{self, Read, Write, IsTerminal},
+    io::{self, IsTerminal, Read, Write},
     path::PathBuf,
 };
 use tokio_stream::StreamExt;
-use log::{info, debug};
 
 // Build-time constants
 const GIT_COMMIT_HASH: &str = env!("GIT_COMMIT_HASH", "unknown");
@@ -19,9 +19,13 @@ const BUILD_TIME: &str = env!("BUILD_TIME", "unknown");
 
 pub fn print_version() {
     println!("ai-cli version {}", env!("CARGO_PKG_VERSION"));
-    println!("Commit: {}{}", GIT_COMMIT_HASH_SHORT, if GIT_DIRTY == "dirty" { "-dirty" } else { "" });
-    println!("Full commit: {}", GIT_COMMIT_HASH);
-    println!("Built: {}", BUILD_TIME);
+    println!(
+        "Commit: {}{}",
+        GIT_COMMIT_HASH_SHORT,
+        if GIT_DIRTY == "dirty" { "-dirty" } else { "" }
+    );
+    println!("Full commit: {GIT_COMMIT_HASH}");
+    println!("Built: {BUILD_TIME}");
 }
 
 // Configuration structure
@@ -110,30 +114,29 @@ struct ChoiceDelta {
 #[tokio::main]
 pub async fn main() -> Result<()> {
     let args = Args::parse();
-    
+
     // Handle version flag
     if args.version {
         print_version();
         return Ok(());
     }
-    
+
     // Initialize logging with appropriate verbosity
     let mut builder = env_logger::Builder::new();
-    
+
     if args.verbose {
         // In verbose mode, show debug logs and above
         builder.filter_level(log::LevelFilter::Debug);
         debug!("Starting AI CLI application in verbose mode");
-        debug!("Command line arguments: {:?}", args);
+        debug!("Command line arguments: {args:?}");
     } else {
         // In normal mode, only show warnings and errors
         builder.filter_level(log::LevelFilter::Warn);
     }
-    
+
     builder.init();
-    
-    let client = Client::builder()
-        .build()?;
+
+    let client = Client::builder().build()?;
     debug!("HTTP client initialized");
 
     // Read all input sources
@@ -145,7 +148,10 @@ pub async fn main() -> Result<()> {
     // Get the final config to determine the model string
     info!("Loading configuration");
     let config = get_final_config(&args).await?;
-    debug!("Using model: {}, base_url: {}", config.model, config.base_url);
+    debug!(
+        "Using model: {}, base_url: {}",
+        config.model, config.base_url
+    );
 
     let request = ChatCompletionRequest {
         model: config.model.clone(),
@@ -159,7 +165,13 @@ pub async fn main() -> Result<()> {
 
     // Send the request and stream the response, passing the api_key from config or args
     info!("Sending request to API");
-    stream_response(&client, config.base_url.as_str(), config.api_key.as_ref(), request).await?;
+    stream_response(
+        &client,
+        config.base_url.as_str(),
+        config.api_key.as_ref(),
+        request,
+    )
+    .await?;
     println!(); // Print a newline at the end for clean output
     info!("Response streaming completed");
 
@@ -175,12 +187,12 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
 
     // Then override with command line arguments if provided
     if let Some(model) = &args.model {
-        debug!("Overriding model with command line argument: {}", model);
+        debug!("Overriding model with command line argument: {model}");
         config.model = model.clone();
     }
 
     if let Some(base_url) = &args.base_url {
-        debug!("Overriding base_url with command line argument: {}", base_url);
+        debug!("Overriding base_url with command line argument: {base_url}");
         config.base_url = base_url.clone();
     }
 
@@ -189,7 +201,10 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
         config.api_key = Some(api_key.clone());
     }
 
-    info!("Final configuration: model={}, base_url={}", config.model, config.base_url);
+    info!(
+        "Final configuration: model={}, base_url={}",
+        config.model, config.base_url
+    );
     if config.api_key.is_some() {
         debug!("API key is configured");
     } else {
@@ -213,11 +228,13 @@ fn load_config() -> Result<AppConfig> {
 
     // Read existing config file
     info!("Reading existing config file");
-    let config_contents = fs::read_to_string(&config_path)
-        .context(format!("Failed to read config file: {}", config_path.display()))?;
+    let config_contents = fs::read_to_string(&config_path).context(format!(
+        "Failed to read config file: {}",
+        config_path.display()
+    ))?;
 
-    let config: AppConfig = toml::from_str(&config_contents)
-        .context("Failed to parse config file as TOML")?;
+    let config: AppConfig =
+        toml::from_str(&config_contents).context("Failed to parse config file as TOML")?;
 
     debug!("Configuration loaded successfully");
     Ok(config)
@@ -227,18 +244,16 @@ fn load_config() -> Result<AppConfig> {
 fn create_default_config(config_dir: &PathBuf) -> Result<()> {
     debug!("Creating config directory: {}", config_dir.display());
     // Create directory if it doesn't exist
-    fs::create_dir_all(config_dir)
-        .context("Failed to create config directory")?;
+    fs::create_dir_all(config_dir).context("Failed to create config directory")?;
 
     // Create default config file
     let default_config = AppConfig::default();
-    let toml_config = toml::to_string(&default_config)
-        .context("Failed to serialize default config")?;
+    let toml_config =
+        toml::to_string(&default_config).context("Failed to serialize default config")?;
 
     let config_file_path = config_dir.join("config.toml");
     debug!("Writing default config to: {}", config_file_path.display());
-    fs::write(config_file_path, toml_config)
-        .context("Failed to write default config file")?;
+    fs::write(config_file_path, toml_config).context("Failed to write default config file")?;
 
     info!("Default configuration created successfully");
     Ok(())
@@ -246,8 +261,7 @@ fn create_default_config(config_dir: &PathBuf) -> Result<()> {
 
 // Get or create config directory
 fn get_config_dir() -> Result<PathBuf> {
-    let home_dir = dirs::home_dir()
-        .ok_or(anyhow::anyhow!("Could not find home directory"))?;
+    let home_dir = dirs::home_dir().ok_or(anyhow::anyhow!("Could not find home directory"))?;
 
     let config_dir = home_dir.join(".config").join("ai-cli");
     debug!("Config directory: {}", config_dir.display());
@@ -268,7 +282,11 @@ async fn read_input(args: &Args) -> Result<String> {
             file.read_to_string(&mut file_content)?;
             input.push_str(&file_content);
             input.push('\n');
-            debug!("File {} read successfully, content length: {}", i + 1, file_content.len());
+            debug!(
+                "File {} read successfully, content length: {}",
+                i + 1,
+                file_content.len()
+            );
         }
     }
 
@@ -276,7 +294,8 @@ async fn read_input(args: &Args) -> Result<String> {
     if io::stdin().is_terminal() && args.files.is_empty() {
         // No files and stdin is tty, prompt for input
         info!("Reading input from terminal (interactive mode)");
-        io::stdout().write_all(b"Enter your input (Ctrl+D to finish):\n")?;
+        io::stdout()
+            .write_all(b"Enter the data you'd like the AI to work on (Ctrl+D to submit):\n")?;
         io::stdout().flush()?;
         io::stdin()
             .read_to_string(&mut input)
@@ -296,7 +315,7 @@ async fn read_input(args: &Args) -> Result<String> {
 
     // Add prompt if provided
     if let Some(prompt) = &args.prompt {
-        debug!("Adding prompt to input: {}", prompt);
+        debug!("Adding prompt to input: {prompt}");
         input = format!("{} {}\n{}", "Prompt:", prompt, input);
     }
 
@@ -314,19 +333,16 @@ async fn stream_response(
     let url = if base_url.ends_with('/') {
         format!("{}/chat/completions", base_url.trim_end_matches('/'))
     } else {
-        format!("{}/chat/completions", base_url)
+        format!("{base_url}/chat/completions")
     };
-    debug!("API endpoint: {}", url);
+    debug!("API endpoint: {url}");
 
     // Add API key to headers if provided
-    let mut request_builder = client
-        .post(&url)
-        .json(&request);
+    let mut request_builder = client.post(&url).json(&request);
 
     if let Some(api_key) = api_key {
         debug!("Adding API key to request headers");
-        request_builder = request_builder
-            .header("Authorization", format!("Bearer {}", api_key));
+        request_builder = request_builder.header("Authorization", format!("Bearer {api_key}"));
     } else {
         debug!("No API key provided - this may cause authentication errors if the API requires authentication");
     }
@@ -336,17 +352,27 @@ async fn stream_response(
         .send()
         .await
         .with_context(|| String::from("Failed to send request"))?;
-    
+
     // Check and log the response status
     let status = response.status();
-    info!("API response status: {} ({})", status.as_u16(), status.canonical_reason().unwrap_or("Unknown"));
-    
+    info!(
+        "API response status: {} ({})",
+        status.as_u16(),
+        status.canonical_reason().unwrap_or("Unknown")
+    );
+
     if !status.is_success() {
-        let error_body = response.text().await
+        let error_body = response
+            .text()
+            .await
             .unwrap_or_else(|_| "Unable to read error response body".to_string());
-        return Err(anyhow::anyhow!("API request failed with status {}: {}", status.as_u16(), error_body));
+        return Err(anyhow::anyhow!(
+            "API request failed with status {}: {}",
+            status.as_u16(),
+            error_body
+        ));
     }
-    
+
     debug!("API connection successful, starting to stream response");
     let mut stream = response.bytes_stream();
 
@@ -373,14 +399,14 @@ async fn stream_response(
                         Ok(response) => {
                             for choice in &response.choices {
                                 if let Some(content) = choice.delta.content.as_ref() {
-                                    print!("{}", content);
+                                    print!("{content}");
                                     io::stdout().flush()?;
                                 }
                             }
                         }
                         Err(e) => {
-                            debug!("Failed to parse JSON response: {}", e);
-                            debug!("Raw data: {}", data);
+                            debug!("Failed to parse JSON response: {e}");
+                            debug!("Raw data: {data}");
                         }
                     }
                 }
@@ -391,10 +417,13 @@ async fn stream_response(
         }
     }
 
-    info!("Streaming completed after {} chunks", chunk_count);
-    debug!("Final incomplete buffer length: {} characters", incomplete.len());
+    info!("Streaming completed after {chunk_count} chunks");
+    debug!(
+        "Final incomplete buffer length: {} characters",
+        incomplete.len()
+    );
     if !incomplete.is_empty() {
-        debug!("Remaining incomplete data: {}", incomplete);
+        debug!("Remaining incomplete data: {incomplete}");
     }
     Ok(())
 }
