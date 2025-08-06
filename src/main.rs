@@ -294,7 +294,8 @@ async fn read_input(args: &Args) -> Result<String> {
     if io::stdin().is_terminal() && args.files.is_empty() {
         // No files and stdin is tty, prompt for input
         info!("Reading input from terminal (interactive mode)");
-        io::stdout().write_all(b"Enter your input (Ctrl+D to finish):\n")?;
+        io::stdout()
+            .write_all(b"Enter the data you'd like the AI to work on (Ctrl+D to submit):\n")?;
         io::stdout().flush()?;
         io::stdin()
             .read_to_string(&mut input)
