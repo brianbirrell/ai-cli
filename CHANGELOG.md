@@ -1,12 +1,13 @@
 # CHANGELOG.md
 
-## 0.2.0 (development)
+## 0.1.2 (2025-08-08)
 
 Security:
-  - TBD
+  - None for this release
 
 Features:
   - Updated input data prompt text -> [#16](https://github.com/brianbirrell/ai-cli/issues/16)
+  - Added version information command line arg -> [#5](https://github.com/brianbirrell/ai-cli/issues/5)
   - Added version information command line arg -> [#5](https://github.com/brianbirrell/ai-cli/issues/5)
   - Added verbose output command line arg -> [#4](https://github.com/brianbirrell/ai-cli/issues/4)
 
