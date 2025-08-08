@@ -85,11 +85,11 @@ jobs:
       run: |
         echo "Checking for release artifacts..."
         ls -la *.tar.gz *.zip || echo "No artifacts found in current directory"
-        if [ ! -f "ai-cli-v${{ github.ref_name }}.tar.gz" ]; then
+        if [ ! -f "ai-cli-${{ github.ref_name }}.tar.gz" ]; then
           echo "❌ Expected tar.gz artifact not found"
           exit 1
         fi
-        if [ ! -f "ai-cli-v${{ github.ref_name }}.zip" ]; then
+        if [ ! -f "ai-cli-${{ github.ref_name }}.zip" ]; then
           echo "❌ Expected zip artifact not found"
           exit 1
         fi
@@ -99,8 +99,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ai-cli-v${{ github.event.release.tag_name }}.tar.gz
-          ai-cli-v${{ github.event.release.tag_name }}.zip
+          ai-cli-${{ github.event.release.tag_name }}.tar.gz
+          ai-cli-${{ github.event.release.tag_name }}.zip
         generate_release_notes: true
         draft: false
         prerelease: false
