@@ -74,21 +74,21 @@ jobs:
         
         # Create tar.gz archive
         cd artifacts
-        tar -czf ../ai-cli-v$VERSION.tar.gz *
+        tar -czf ../ai-cli-v$VERSION-linux-x86_64.tar.gz *
         
         # Create zip archive for Windows users
         cd ..
-        zip -r ai-cli-v$VERSION.zip artifacts/
+        zip -r ai-cli-v$VERSION-linux-x86_64.zip artifacts/
         
     - name: Verify artifacts
       run: |
         echo "Checking for release artifacts..."
         ls -la *.tar.gz *.zip || echo "No artifacts found in current directory"
-        if [ ! -f "ai-cli-${{ github.ref_name }}.tar.gz" ]; then
+        if [ ! -f "ai-cli-${{ github.ref_name }}-linux-x86_64.tar.gz" ]; then
           echo "❌ Expected tar.gz artifact not found"
           exit 1
         fi
-        if [ ! -f "ai-cli-${{ github.ref_name }}.zip" ]; then
+        if [ ! -f "ai-cli-${{ github.ref_name }}-linux-x86_64.zip" ]; then
           echo "❌ Expected zip artifact not found"
           exit 1
         fi
@@ -98,8 +98,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ai-cli-${{ github.event.release.tag_name }}.tar.gz
-          ai-cli-${{ github.event.release.tag_name }}.zip
+          ai-cli-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
+          ai-cli-${{ github.event.release.tag_name }}-linux-x86_64.zip
         generate_release_notes: true
         draft: false
         prerelease: false

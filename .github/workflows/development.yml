@@ -93,19 +93,19 @@ jobs:
         
         # Create tar.gz archive with development version
         cd artifacts
-        tar -czf ../ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz *
+        tar -czf ../ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.tar.gz *
         
         # Create zip archive for Windows users
         cd ..
-        zip -r ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip artifacts/
+        zip -r ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.zip artifacts/
         
     - name: Upload pre-release artifacts
       uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.commit.outputs.artifact_name }}
         path: |
-          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz
-          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip
+          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.tar.gz
+          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.zip
         retention-days: 30
 
   create-development-release:
@@ -143,11 +143,11 @@ jobs:
       run: |
         echo "Checking for artifacts in artifacts/ directory..."
         ls -la artifacts/
-        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.tar.gz" ]; then
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.tar.gz" ]; then
           echo "❌ Expected tar.gz artifact not found"
           exit 1
         fi
-        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}.zip" ]; then
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.zip" ]; then
           echo "❌ Expected zip artifact not found"
           exit 1
         fi
