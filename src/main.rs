@@ -35,18 +35,8 @@ struct AppConfig {
     base_url: String,
     api_key: Option<String>,
     default_prompt: Option<String>,
-    #[serde(default = "default_temperature")]
     temperature: f32,
-    #[serde(default = "default_timeout_secs", alias = "timeout_ms")]
     timeout_secs: u64,
-}
-
-fn default_temperature() -> f32 {
-    0.7
-}
-
-fn default_timeout_secs() -> u64 {
-    30
 }
 
 impl AppConfig {
@@ -57,7 +47,7 @@ impl AppConfig {
             api_key: None,
             default_prompt: None,
             temperature: 0.7,
-            timeout_secs: 30, // 30 seconds default timeout
+            timeout_secs: 300, // 300 seconds default timeout
         }
     }
 }
@@ -96,11 +86,19 @@ pub struct Args {
     version: bool,
 
     /// LLM temperature (0.0-2.0) - controls randomness
-    #[arg(long, value_name = "FLOAT", help = "LLM temperature between 0.0 (deterministic) and 2.0 (creative)")]
+    #[arg(
+        long,
+        value_name = "FLOAT",
+        help = "LLM temperature between 0.0 (deterministic) and 2.0 (creative)"
+    )]
     temperature: Option<f32>,
 
     /// Connection timeout in seconds (applies only until first chunk arrives)
-    #[arg(long, value_name = "SECS", help = "Connection timeout in seconds until first chunk (default: 30)")]
+    #[arg(
+        long,
+        value_name = "SECS",
+        help = "Connection timeout in seconds until first chunk (default: 300)"
+    )]
     timeout: Option<u64>,
 }
 
@@ -440,16 +438,14 @@ async fn stream_response(
 
     if let Some(first_chunk_result) = first_chunk {
         chunk_count += 1;
-        let chunk = first_chunk_result
-            .with_context(|| String::from("Failed to read response chunk"))?;
+        let chunk =
+            first_chunk_result.with_context(|| String::from("Failed to read response chunk"))?;
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
         debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
         incomplete.push_str(text);
     } else {
-        return Err(anyhow::anyhow!(
-            "Stream ended before any data was received"
-        ));
+        return Err(anyhow::anyhow!("Stream ended before any data was received"));
     }
 
     // After the first chunk, continue without timeout
