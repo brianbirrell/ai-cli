@@ -15,6 +15,8 @@ async fn test_read_empty_stdinput() {
         api_key: None,
         verbose: false,
         version: false,
+        temperature: None,
+        timeout: None,
     };
 
     assert!(args.files.is_empty());
@@ -35,6 +37,8 @@ async fn test_read_from_file() {
         api_key: None,
         verbose: false,
         version: false,
+        temperature: None,
+        timeout: None,
     };
 
     let input = read_input(&args).await.unwrap();
@@ -51,6 +55,8 @@ async fn test_read_with_prompt() {
         api_key: None,
         verbose: false,
         version: false,
+        temperature: None,
+        timeout: None,
     };
 
     // Note: This test would need proper stdin mocking to work correctly
@@ -97,6 +103,8 @@ fn test_version_flag_parsing() {
         api_key: None,
         verbose: false,
         version: true,
+        temperature: None,
+        timeout: None,
     };
 
     assert!(args.version);
@@ -109,7 +117,30 @@ fn test_version_flag_parsing() {
         api_key: None,
         verbose: false,
         version: false,
+        temperature: None,
+        timeout: None,
     };
 
     assert!(!args.version);
+}
+
+#[test]
+fn test_temperature_validation() {
+    // Test valid temperature values
+    assert!(validate_temperature(0.0).is_ok());
+    assert!(validate_temperature(0.7).is_ok());
+    assert!(validate_temperature(1.0).is_ok());
+    assert!(validate_temperature(2.0).is_ok());
+
+    // Test invalid temperature values
+    assert!(validate_temperature(-0.1).is_err());
+    assert!(validate_temperature(2.1).is_err());
+    assert!(validate_temperature(5.0).is_err());
+}
+
+#[test]
+fn test_config_defaults() {
+    let config = AppConfig::default();
+    assert_eq!(config.temperature, 0.7);
+    assert_eq!(config.timeout_secs, 300);
 }
