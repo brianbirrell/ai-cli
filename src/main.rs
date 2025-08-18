@@ -37,16 +37,16 @@ struct AppConfig {
     default_prompt: Option<String>,
     #[serde(default = "default_temperature")]
     temperature: f32,
-    #[serde(default = "default_timeout_ms")]
-    timeout_ms: u64,
+    #[serde(default = "default_timeout_secs", alias = "timeout_ms")]
+    timeout_secs: u64,
 }
 
 fn default_temperature() -> f32 {
     0.7
 }
 
-fn default_timeout_ms() -> u64 {
-    30000
+fn default_timeout_secs() -> u64 {
+    30
 }
 
 impl AppConfig {
@@ -57,7 +57,7 @@ impl AppConfig {
             api_key: None,
             default_prompt: None,
             temperature: 0.7,
-            timeout_ms: 30000, // 30 seconds default timeout
+            timeout_secs: 30, // 30 seconds default timeout
         }
     }
 }
@@ -99,8 +99,8 @@ pub struct Args {
     #[arg(long, value_name = "FLOAT", help = "LLM temperature between 0.0 (deterministic) and 2.0 (creative)")]
     temperature: Option<f32>,
 
-    /// Connection timeout in milliseconds
-    #[arg(long, value_name = "MS", help = "Connection timeout in milliseconds (default: 30000)")]
+    /// Connection timeout in seconds (applies only until first chunk arrives)
+    #[arg(long, value_name = "SECS", help = "Connection timeout in seconds until first chunk (default: 30)")]
     timeout: Option<u64>,
 }
 
@@ -161,10 +161,8 @@ pub async fn main() -> Result<()> {
 
     // Load and merge configuration from file and command line
     let config = get_final_config(&args).await?;
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_millis(config.timeout_ms))
-        .build()?;
-    debug!("HTTP client initialized with {}ms timeout", config.timeout_ms);
+    let client = Client::builder().build()?;
+    debug!("HTTP client initialized with no global timeout");
 
     // Read all input sources
     info!("Reading input from files and/or stdin");
@@ -174,8 +172,8 @@ pub async fn main() -> Result<()> {
     // Build the request
     info!("Building request with configuration");
     debug!(
-        "Using model: {}, base_url: {}, temperature: {}, timeout: {}ms",
-        config.model, config.base_url, config.temperature, config.timeout_ms
+        "Using model: {}, base_url: {}, temperature: {}, first-chunk timeout: {}s",
+        config.model, config.base_url, config.temperature, config.timeout_secs
     );
 
     let request = ChatCompletionRequest {
@@ -196,6 +194,7 @@ pub async fn main() -> Result<()> {
         config.base_url.as_str(),
         config.api_key.as_ref(),
         request,
+        config.timeout_secs,
     )
     .await?;
     println!(); // Print a newline at the end for clean output
@@ -247,13 +246,13 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
     }
 
     if let Some(timeout) = args.timeout {
-        debug!("Overriding timeout with command line argument: {timeout}ms");
-        config.timeout_ms = timeout;
+        debug!("Overriding timeout with command line argument: {timeout}s");
+        config.timeout_secs = timeout;
     }
 
     info!(
-        "Final configuration: model={}, base_url={}, temperature={}, timeout={}ms",
-        config.model, config.base_url, config.temperature, config.timeout_ms
+        "Final configuration: model={}, base_url={}, temperature={}, timeout={}s",
+        config.model, config.base_url, config.temperature, config.timeout_secs
     );
     if config.api_key.is_some() {
         debug!("API key is configured");
@@ -378,6 +377,7 @@ async fn stream_response(
     base_url: &str,
     api_key: Option<&String>,
     request: ChatCompletionRequest,
+    first_chunk_timeout_secs: u64,
 ) -> Result<()> {
     // Construct the full URL
     let url = if base_url.ends_with('/') {
@@ -430,6 +430,29 @@ async fn stream_response(
     let mut chunk_count = 0;
 
     info!("Starting to stream response");
+    // Wait for the first chunk with timeout
+    let first_chunk = tokio::time::timeout(
+        std::time::Duration::from_secs(first_chunk_timeout_secs),
+        stream.next(),
+    )
+    .await
+    .with_context(|| String::from("Timed out waiting for the first response chunk"))?;
+
+    if let Some(first_chunk_result) = first_chunk {
+        chunk_count += 1;
+        let chunk = first_chunk_result
+            .with_context(|| String::from("Failed to read response chunk"))?;
+        let text = std::str::from_utf8(&chunk)
+            .with_context(|| String::from("Failed to decode response as UTF-8"))?;
+        debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
+        incomplete.push_str(text);
+    } else {
+        return Err(anyhow::anyhow!(
+            "Stream ended before any data was received"
+        ));
+    }
+
+    // After the first chunk, continue without timeout
     while let Some(chunk) = stream.next().await {
         chunk_count += 1;
         let chunk = chunk.with_context(|| String::from("Failed to read response chunk"))?;
