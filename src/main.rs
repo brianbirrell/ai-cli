@@ -35,6 +35,18 @@ struct AppConfig {
     base_url: String,
     api_key: Option<String>,
     default_prompt: Option<String>,
+    #[serde(default = "default_temperature")]
+    temperature: f32,
+    #[serde(default = "default_timeout_ms")]
+    timeout_ms: u64,
+}
+
+fn default_temperature() -> f32 {
+    0.7
+}
+
+fn default_timeout_ms() -> u64 {
+    30000
 }
 
 impl AppConfig {
@@ -44,6 +56,8 @@ impl AppConfig {
             base_url: "http://localhost:11434/v1".to_string(),
             api_key: None,
             default_prompt: None,
+            temperature: 0.7,
+            timeout_ms: 30000, // 30 seconds default timeout
         }
     }
 }
@@ -80,6 +94,14 @@ pub struct Args {
     /// Show version information
     #[arg(long)]
     version: bool,
+
+    /// LLM temperature (0.0-2.0) - controls randomness
+    #[arg(long, value_name = "FLOAT", help = "LLM temperature between 0.0 (deterministic) and 2.0 (creative)")]
+    temperature: Option<f32>,
+
+    /// Connection timeout in milliseconds
+    #[arg(long, value_name = "MS", help = "Connection timeout in milliseconds (default: 30000)")]
+    timeout: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -87,6 +109,7 @@ struct ChatCompletionRequest {
     model: String,
     messages: Vec<ChatMessage>,
     stream: bool,
+    temperature: f32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -136,8 +159,12 @@ pub async fn main() -> Result<()> {
 
     builder.init();
 
-    let client = Client::builder().build()?;
-    debug!("HTTP client initialized");
+    // Load and merge configuration from file and command line
+    let config = get_final_config(&args).await?;
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_millis(config.timeout_ms))
+        .build()?;
+    debug!("HTTP client initialized with {}ms timeout", config.timeout_ms);
 
     // Read all input sources
     info!("Reading input from files and/or stdin");
@@ -145,12 +172,10 @@ pub async fn main() -> Result<()> {
     debug!("Input length: {} characters", input.len());
 
     // Build the request
-    // Get the final config to determine the model string
-    info!("Loading configuration");
-    let config = get_final_config(&args).await?;
+    info!("Building request with configuration");
     debug!(
-        "Using model: {}, base_url: {}",
-        config.model, config.base_url
+        "Using model: {}, base_url: {}, temperature: {}, timeout: {}ms",
+        config.model, config.base_url, config.temperature, config.timeout_ms
     );
 
     let request = ChatCompletionRequest {
@@ -160,6 +185,7 @@ pub async fn main() -> Result<()> {
             content: input,
         }],
         stream: true,
+        temperature: config.temperature,
     };
     debug!("Request prepared with streaming enabled");
 
@@ -176,6 +202,17 @@ pub async fn main() -> Result<()> {
     info!("Response streaming completed");
 
     Ok(())
+}
+
+// Validate temperature is within acceptable range (0.0-2.0)
+fn validate_temperature(temperature: f32) -> Result<f32> {
+    if temperature < 0.0 || temperature > 2.0 {
+        return Err(anyhow::anyhow!(
+            "Temperature must be between 0.0 and 2.0, got: {}",
+            temperature
+        ));
+    }
+    Ok(temperature)
 }
 
 // Load and merge configuration from file and command line
@@ -201,9 +238,22 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
         config.api_key = Some(api_key.clone());
     }
 
+    if let Some(temperature) = args.temperature {
+        debug!("Overriding temperature with command line argument: {temperature}");
+        config.temperature = validate_temperature(temperature)?;
+    } else {
+        // Validate the config file temperature as well
+        config.temperature = validate_temperature(config.temperature)?;
+    }
+
+    if let Some(timeout) = args.timeout {
+        debug!("Overriding timeout with command line argument: {timeout}ms");
+        config.timeout_ms = timeout;
+    }
+
     info!(
-        "Final configuration: model={}, base_url={}",
-        config.model, config.base_url
+        "Final configuration: model={}, base_url={}, temperature={}, timeout={}ms",
+        config.model, config.base_url, config.temperature, config.timeout_ms
     );
     if config.api_key.is_some() {
         debug!("API key is configured");
