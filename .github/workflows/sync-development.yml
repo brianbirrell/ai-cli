@@ -23,14 +23,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: development
 
-      - name: Configure Git
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
       - name: Sync development branch with main
         run: |
           cd development
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
           git fetch origin main
           git merge origin/main --allow-unrelated-histories --no-edit
           git push origin development
