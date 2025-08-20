@@ -29,7 +29,12 @@ jobs:
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git fetch origin main
-          git merge origin/main --allow-unrelated-histories --no-edit
+          git merge origin/main --allow-unrelated-histories --no-edit || {
+            # If merge fails due to conflicts, resolve by taking main branch version
+            git status --porcelain | grep "^UU" | cut -c4- | xargs -I {} git checkout --theirs {}
+            git add .
+            git commit -m "Auto-resolve merge conflicts by taking main branch version"
+          }
           git push origin development
 
       - name: Create sync summary
