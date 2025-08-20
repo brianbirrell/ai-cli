@@ -32,7 +32,7 @@ jobs:
         run: |
           cd development
           git fetch origin main
-          git merge origin/main --no-edit
+          git merge origin/main --allow-unrelated-histories --no-edit
           git push origin development
 
       - name: Create sync summary
