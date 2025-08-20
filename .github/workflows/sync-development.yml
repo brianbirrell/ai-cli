@@ -6,8 +6,8 @@ on:
       - main
   workflow_dispatch: # Allow manual triggering
 
-  permissions: 
-    contents: write
+permissions:
+  contents: write
 
 jobs:
   sync-development:
