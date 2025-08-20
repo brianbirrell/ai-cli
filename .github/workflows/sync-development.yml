@@ -1,0 +1,43 @@
+name: Sync Development Branch with Main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  sync-development:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: development
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Sync development branch with main
+        run: |
+          cd development
+          git fetch origin main
+          git merge origin/main --no-edit
+          git push origin development
+
+      - name: Create sync summary
+        run: |
+          echo "## Development Branch Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully synced development branch with main" >> $GITHUB_STEP_SUMMARY
+          echo "🕐 Sync completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "📝 Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
