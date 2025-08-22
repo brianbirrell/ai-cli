@@ -395,7 +395,22 @@ async fn stream_response(
         debug!("No API key provided - this may cause authentication errors if the API requires authentication");
     }
 
+    // Enhanced logging for debugging - log full request details
+    info!("=== SERVICE CALL DETAILS ===");
+    info!("URL: {}", url);
+    info!("Request Body: {}", serde_json::to_string_pretty(&request).unwrap_or_else(|_| "Failed to serialize request".to_string()));
+    
+    // Log headers that will be sent
+    let mut headers_log = String::from("Headers: ");
+    if let Some(_api_key) = api_key {
+        headers_log.push_str("Authorization: Bearer ***, ");
+    }
+    headers_log.push_str("Content-Type: application/json");
+    info!("{}", headers_log);
+    info!("=== END SERVICE CALL DETAILS ===");
+
     info!("Sending streaming request to API");
+    debug!("Request builder prepared, sending HTTP POST request");
     let response = request_builder
         .send()
         .await
