@@ -8,20 +8,20 @@ chrono = "0.4"
 
 [dependencies]
 tokio = { version = "1.0", features = ["full", "sync"] }
-reqwest = { version = "0.11", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.0", features = ["derive", "cargo"] }
 futures = "0.3"
 anyhow = "1.0"
-tempfile = "3.3"  # For testing
+tempfile = "3.21"  # For testing
 mockito = "1.0"   # For testing
 tokio-stream = "0.1.17"
 futures-util = "0.3.31"
 dirs = "4.0"  # For finding configuration directory
-toml = "0.7"  # For reading TOML config files
+toml = "0.9"  # For reading TOML config files
 configparser = "3.0"  # Or use serpent if you prefer different config format
 libc = "0.2"
 fs = "0.0.5"
 log = "0.4"  # For structured logging
-env_logger = "0.10"  # For logging implementation
+env_logger = "0.11"  # For logging implementation
