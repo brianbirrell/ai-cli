@@ -21,7 +21,7 @@ A command-line OpenAI-compatible API client, written in Rust, for interacting wi
 
 ## Project like this one
 
-See also: [shell_gpt](https://github.com/TheR1D/shell_gpt?tab=readme-ov-file)
+See also: [shell_gpt](https://github.com/TheR1D/shell_gpt), [ai-shell](https://github.com/BuilderIO/ai-shell)
 
 # Getting Started
 
