@@ -398,8 +398,12 @@ async fn stream_response(
     // Enhanced logging for debugging - log full request details
     info!("=== SERVICE CALL DETAILS ===");
     info!("URL: {}", url);
-    info!("Request Body: {}", serde_json::to_string_pretty(&request).unwrap_or_else(|_| "Failed to serialize request".to_string()));
-    
+    info!(
+        "Request Body: {}",
+        serde_json::to_string_pretty(&request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string())
+    );
+
     // Log headers that will be sent
     let mut headers_log = String::from("Headers: ");
     if let Some(_api_key) = api_key {
