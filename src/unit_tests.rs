@@ -144,3 +144,64 @@ fn test_config_defaults() {
     assert_eq!(config.temperature, 0.7);
     assert_eq!(config.timeout_secs, 300);
 }
+
+// Security tests
+#[test]
+fn test_sanitize_output_content() {
+    // Test normal content
+    let normal_content = "Hello, world!";
+    let sanitized = sanitize_output_content(normal_content);
+    assert_eq!(sanitized, normal_content);
+
+    // Test content with dangerous patterns
+    let dangerous_content = "```bash\nsudo rm -rf /\n```";
+    let sanitized = sanitize_output_content(dangerous_content);
+    // Should escape dangerous characters but not block content
+    assert!(sanitized.contains("\\`"));
+    assert!(sanitized.contains("\\-"));
+    assert!(sanitized.contains("\\/"));
+}
+
+#[test]
+fn test_sanitize_output_content_size_limit() {
+    // Test content exceeding size limit
+    let large_content = "x".repeat(1024 * 1024 + 1); // 1MB + 1 byte
+    let sanitized = sanitize_output_content(&large_content);
+    assert_eq!(sanitized, "[Output truncated due to size limit]");
+}
+
+#[test]
+fn test_sanitize_output_content_null_bytes() {
+    // Test content with null bytes
+    let content_with_nulls = "Hello\0World";
+    let sanitized = sanitize_output_content(content_with_nulls);
+    assert_eq!(sanitized, "Hello\nWorld");
+}
+
+#[test]
+fn test_sanitize_output_content_empty() {
+    // Test empty content
+    let empty_content = "";
+    let sanitized = sanitize_output_content(empty_content);
+    assert_eq!(sanitized, "[Empty output]");
+}
+
+#[test]
+fn test_sanitize_output_content_dangerous_characters() {
+    // Test content with dangerous shell characters
+    let dangerous_chars = "`$()[]{}|&;<>";
+    let sanitized = sanitize_output_content(dangerous_chars);
+    assert!(sanitized.contains("\\`"));
+    assert!(sanitized.contains("\\$"));
+    assert!(sanitized.contains("\\("));
+    assert!(sanitized.contains("\\)"));
+    assert!(sanitized.contains("\\["));
+    assert!(sanitized.contains("\\]"));
+    assert!(sanitized.contains("\\{"));
+    assert!(sanitized.contains("\\}"));
+    assert!(sanitized.contains("\\|"));
+    assert!(sanitized.contains("\\&"));
+    assert!(sanitized.contains("\\;"));
+    assert!(sanitized.contains("\\<"));
+    assert!(sanitized.contains("\\>"));
+}

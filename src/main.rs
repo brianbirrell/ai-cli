@@ -498,7 +498,9 @@ async fn stream_response(
                         Ok(response) => {
                             for choice in &response.choices {
                                 if let Some(content) = choice.delta.content.as_ref() {
-                                    print!("{content}");
+                                    // Security: Sanitize output content to prevent command injection
+                                    let sanitized_content = sanitize_output_content(content);
+                                    print!("{}", sanitized_content);
                                     io::stdout().flush()?;
                                 }
                             }

@@ -18,6 +18,25 @@ A command-line OpenAI-compatible API client, written in Rust, for interacting wi
 - 🔄 Integrates smoothly into shell scripts and pipelines.
 - 📊 Verbose logging for debugging and monitoring.
 - ℹ️ Version information display.
+- 🔒 **Security features for input/output sanitization and prompt injection protection.**
+
+## Security Features
+
+**ai-cli** includes several security measures to protect against common vulnerabilities:
+
+- **Input Sanitization**: All file and stdin input is sanitized to remove null bytes and normalize line endings
+- **Size Limits**: Input and output are limited to 1MB to prevent memory exhaustion attacks
+- **Path Validation**: File paths are validated to prevent directory traversal attacks
+- **Output Sanitization**: LLM responses are sanitized to escape potentially dangerous shell characters
+- **Pattern Detection**: Dangerous patterns (like shell commands, system calls) are detected and logged
+- **Content Validation**: Input content is validated to ensure it's not empty after sanitization
+
+These security features help protect against:
+- Prompt injection attacks
+- Command injection through LLM responses
+- Directory traversal attacks
+- Memory exhaustion attacks
+- Null byte injection
 
 ## Project like this one
 
