@@ -68,7 +68,8 @@ cat myfile.txt | ai-cli -m llama3 -p "What is in this file?"
 ai-cli -f notes.txt -f summary.txt -p "Summarize these notes"
 
 # Verbose output for debugging
-ai-cli -v -p "Test prompt"
+ai-cli -v -p "Test prompt"          # Basic debug info
+ai-cli -vv -p "Test prompt"         # Detailed request/response info
 
 # Show version information
 ai-cli --version
@@ -85,7 +86,8 @@ All options are optional _except_ for `-p, --prompt`, which is required.
 - `-f, --files <file>` (optional): One or more files to send as input
 - `--base-url <url>` (optional): API endpoint (default: http://localhost:11434/v1)
 - `--api-key <key>` (optional): API key for authentication, if needed
-- `-v, --verbose` (optional): Enable verbose logging
+- `--temperature <float>` (optional): LLM temperature between 0.0 (deterministic) and 2.0 (creative)
+- `-v, --verbose` (optional): Enable verbose logging (use -v for basic debug, -vv for detailed request/response info)
 - `--version` (optional): Show version information
 
 ## Configuration
@@ -98,6 +100,7 @@ model = "llama3"
 base_url = "http://localhost:11434/v1"
 api_key = "your-api-key-here"
 default_prompt = "You are a helpful assistant."
+temperature = 0.7  # Optional: omit to use LLM's default temperature
 ```
 
 Command-line arguments will override config file values.

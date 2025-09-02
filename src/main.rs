@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use log::{debug, info};
+use log::{debug, info, trace};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,7 +35,8 @@ struct AppConfig {
     base_url: String,
     api_key: Option<String>,
     default_prompt: Option<String>,
-    temperature: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
     timeout_secs: u64,
 }
 
@@ -46,7 +47,7 @@ impl AppConfig {
             base_url: "http://localhost:11434/v1".to_string(),
             api_key: None,
             default_prompt: None,
-            temperature: 0.7,
+            temperature: None, // Use LLM default temperature
             timeout_secs: 300, // 300 seconds default timeout
         }
     }
@@ -77,9 +78,9 @@ pub struct Args {
     #[arg(long)]
     api_key: Option<String>,
 
-    /// Enable verbose logging
-    #[arg(short, long)]
-    verbose: bool,
+    /// Enable verbose logging (use -v for basic debug, -vv for detailed request/response info)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
 
     /// Show version information
     #[arg(long)]
@@ -107,7 +108,8 @@ struct ChatCompletionRequest {
     model: String,
     messages: Vec<ChatMessage>,
     stream: bool,
-    temperature: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -145,14 +147,23 @@ pub async fn main() -> Result<()> {
     // Initialize logging with appropriate verbosity
     let mut builder = env_logger::Builder::new();
 
-    if args.verbose {
-        // In verbose mode, show debug logs and above
-        builder.filter_level(log::LevelFilter::Debug);
-        debug!("Starting AI CLI application in verbose mode");
-        debug!("Command line arguments: {args:?}");
-    } else {
-        // In normal mode, only show warnings and errors
-        builder.filter_level(log::LevelFilter::Warn);
+    match args.verbose {
+        0 => {
+            // In normal mode, only show warnings and errors
+            builder.filter_level(log::LevelFilter::Warn);
+        }
+        1 => {
+            // In basic verbose mode (-v), show debug logs and above
+            builder.filter_level(log::LevelFilter::Debug);
+            debug!("Starting AI CLI application in basic verbose mode");
+            debug!("Command line arguments: {args:?}");
+        }
+        2.. => {
+            // In detailed verbose mode (-vv or more), show trace logs and above
+            builder.filter_level(log::LevelFilter::Trace);
+            trace!("Starting AI CLI application in detailed verbose mode");
+            trace!("Command line arguments: {args:?}");
+        }
     }
 
     builder.init();
@@ -170,7 +181,7 @@ pub async fn main() -> Result<()> {
     // Build the request
     info!("Building request with configuration");
     debug!(
-        "Using model: {}, base_url: {}, temperature: {}, first-chunk timeout: {}s",
+        "Using model: {}, base_url: {}, temperature: {:?}, first-chunk timeout: {}s",
         config.model, config.base_url, config.temperature, config.timeout_secs
     );
 
@@ -237,11 +248,12 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
 
     if let Some(temperature) = args.temperature {
         debug!("Overriding temperature with command line argument: {temperature}");
-        config.temperature = validate_temperature(temperature)?;
-    } else {
+        config.temperature = Some(validate_temperature(temperature)?);
+    } else if let Some(temperature) = config.temperature {
         // Validate the config file temperature as well
-        config.temperature = validate_temperature(config.temperature)?;
+        config.temperature = Some(validate_temperature(temperature)?);
     }
+    // If temperature is None in both config and args, leave it as None to use LLM default
 
     if let Some(timeout) = args.timeout {
         debug!("Overriding timeout with command line argument: {timeout}s");
@@ -249,7 +261,7 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
     }
 
     info!(
-        "Final configuration: model={}, base_url={}, temperature={}, timeout={}s",
+        "Final configuration: model={}, base_url={}, temperature={:?}, timeout={}s",
         config.model, config.base_url, config.temperature, config.timeout_secs
     );
     if config.api_key.is_some() {
@@ -395,7 +407,26 @@ async fn stream_response(
         debug!("No API key provided - this may cause authentication errors if the API requires authentication");
     }
 
+    // Enhanced logging for debugging - log full request details
+    trace!("=== SERVICE CALL DETAILS ===");
+    trace!("URL: {url}");
+    trace!(
+        "Request Body: {}",
+        serde_json::to_string_pretty(&request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string())
+    );
+
+    // Log headers that will be sent
+    let mut headers_log = String::from("Headers: ");
+    if let Some(_api_key) = api_key {
+        headers_log.push_str("Authorization: Bearer ***, ");
+    }
+    headers_log.push_str("Content-Type: application/json");
+    trace!("{headers_log}");
+    trace!("=== END SERVICE CALL DETAILS ===");
+
     info!("Sending streaming request to API");
+    debug!("Request builder prepared, sending HTTP POST request");
     let response = request_builder
         .send()
         .await
@@ -443,6 +474,7 @@ async fn stream_response(
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
         debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
+        trace!("Chunk {chunk_count} content: {text:?}");
         incomplete.push_str(text);
     } else {
         return Err(anyhow::anyhow!("Stream ended before any data was received"));
@@ -456,6 +488,7 @@ async fn stream_response(
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
 
         debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
+        trace!("Chunk {chunk_count} content: {text:?}");
         incomplete.push_str(text);
 
         // Process complete lines only

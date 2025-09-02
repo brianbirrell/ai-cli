@@ -13,7 +13,7 @@ async fn test_read_empty_stdinput() {
         model: None,
         base_url: None,
         api_key: None,
-        verbose: false,
+        verbose: 0,
         version: false,
         temperature: None,
         timeout: None,
@@ -35,7 +35,7 @@ async fn test_read_from_file() {
         model: None,
         base_url: None,
         api_key: None,
-        verbose: false,
+        verbose: 0,
         version: false,
         temperature: None,
         timeout: None,
@@ -53,7 +53,7 @@ async fn test_read_with_prompt() {
         model: None,
         base_url: None,
         api_key: None,
-        verbose: false,
+        verbose: 0,
         version: false,
         temperature: None,
         timeout: None,
@@ -101,7 +101,7 @@ fn test_version_flag_parsing() {
         model: None,
         base_url: None,
         api_key: None,
-        verbose: false,
+        verbose: 0,
         version: true,
         temperature: None,
         timeout: None,
@@ -115,7 +115,7 @@ fn test_version_flag_parsing() {
         model: None,
         base_url: None,
         api_key: None,
-        verbose: false,
+        verbose: 0,
         version: false,
         temperature: None,
         timeout: None,
@@ -141,6 +141,20 @@ fn test_temperature_validation() {
 #[test]
 fn test_config_defaults() {
     let config = AppConfig::default();
-    assert_eq!(config.temperature, 0.7);
+    assert_eq!(config.temperature, None);
     assert_eq!(config.timeout_secs, 300);
+}
+
+#[test]
+fn test_config_without_temperature() {
+    // Test that we can create a config without temperature (using LLM default)
+    let config = AppConfig {
+        model: "llama3".to_string(),
+        base_url: "http://localhost:11434/v1".to_string(),
+        api_key: None,
+        default_prompt: None,
+        temperature: None, // This should be allowed now
+        timeout_secs: 300,
+    };
+    assert_eq!(config.temperature, None);
 }
