@@ -35,6 +35,7 @@ struct AppConfig {
     base_url: String,
     api_key: Option<String>,
     default_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     timeout_secs: u64,
 }
@@ -46,7 +47,7 @@ impl AppConfig {
             base_url: "http://localhost:11434/v1".to_string(),
             api_key: None,
             default_prompt: None,
-            temperature: Some(0.7),
+            temperature: None, // Use LLM default temperature
             timeout_secs: 300, // 300 seconds default timeout
         }
     }

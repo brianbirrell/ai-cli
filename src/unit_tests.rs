@@ -141,7 +141,7 @@ fn test_temperature_validation() {
 #[test]
 fn test_config_defaults() {
     let config = AppConfig::default();
-    assert_eq!(config.temperature, Some(0.7));
+    assert_eq!(config.temperature, None);
     assert_eq!(config.timeout_secs, 300);
 }
 
