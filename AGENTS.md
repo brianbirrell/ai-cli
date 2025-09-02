@@ -6,15 +6,18 @@ the guidelines below so that the development experience continues to work smooth
 
 ## 1. Use Cargo for Development, **not** manual compilation
 
+* **Always create a specific branch** for any changes.  Use the 'development' branch as the
+  base.
+* **Create or update unit tests** for any code changes and always verify they are passing.
+* **Do _not_ create a PR** for any changes unless requested.
+* **Update documentation** including README.md and markdown files in the 'docs' directory.
+* **Do _not_ update CHANGELOG.md** unless requested.
 * **Always use `cargo run` for testing the CLI application** while iterating on the
   code. This ensures proper dependency resolution and incremental compilation.
 * **Use `cargo check` for quick syntax checking** without full compilation.
 * **Do _not_ run `cargo build --release` inside the agent session** unless specifically
   needed for performance testing. The release build takes longer and may not be necessary
   for development iterations.
-* **Always create a specific branch** for any changes.  Use the 'development' branch as the
-  base.
-* **Do not create a PR** for any changes unless requested.
 
 ## 2. Keep Dependencies in Sync
 
