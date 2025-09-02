@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 0.2.0 (2025-09-01)
+
+Features:
+  - Added LLM temperature control option -> [#12](https://github.com/brianbirrell/ai-cli/issues/12) and [#54](https://github.com/brianbirrell/ai-cli/issues/54)
+  - Added connection timeout configuration option -> [#12](https://github.com/brianbirrell/ai-cli/issues/12)
+  - Enhance logging of service calls -> [#14](https://github.com/brianbirrell/ai-cli/issues/14)
+  - Update input data prompt text -> [#16](https://github.com/brianbirrell/ai-cli/issues/16)
+  - Add the OpenAI AGENTS.md specification to the project -> [#52](https://github.com/brianbirrell/ai-cli/issues/52)
+
+Dependencies:
+  - Updated multiple dependencies to latest versions
+
 ## 0.1.2 (2025-08-08)
 
 Security:
