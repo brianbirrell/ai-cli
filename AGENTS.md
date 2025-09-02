@@ -12,6 +12,9 @@ the guidelines below so that the development experience continues to work smooth
 * **Do _not_ run `cargo build --release` inside the agent session** unless specifically
   needed for performance testing. The release build takes longer and may not be necessary
   for development iterations.
+* **Always create a specific branch** for any changes.  Use the 'development' branch as the
+  base.
+* **Do not create a PR** for any changes unless requested.
 
 ## 2. Keep Dependencies in Sync
 
