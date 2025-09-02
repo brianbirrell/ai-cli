@@ -35,7 +35,8 @@ struct AppConfig {
     base_url: String,
     api_key: Option<String>,
     default_prompt: Option<String>,
-    temperature: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
     timeout_secs: u64,
 }
 
@@ -46,7 +47,7 @@ impl AppConfig {
             base_url: "http://localhost:11434/v1".to_string(),
             api_key: None,
             default_prompt: None,
-            temperature: 0.7,
+            temperature: None, // Use LLM default temperature
             timeout_secs: 300, // 300 seconds default timeout
         }
     }
@@ -107,7 +108,8 @@ struct ChatCompletionRequest {
     model: String,
     messages: Vec<ChatMessage>,
     stream: bool,
-    temperature: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -179,7 +181,7 @@ pub async fn main() -> Result<()> {
     // Build the request
     info!("Building request with configuration");
     debug!(
-        "Using model: {}, base_url: {}, temperature: {}, first-chunk timeout: {}s",
+        "Using model: {}, base_url: {}, temperature: {:?}, first-chunk timeout: {}s",
         config.model, config.base_url, config.temperature, config.timeout_secs
     );
 
@@ -246,11 +248,12 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
 
     if let Some(temperature) = args.temperature {
         debug!("Overriding temperature with command line argument: {temperature}");
-        config.temperature = validate_temperature(temperature)?;
-    } else {
+        config.temperature = Some(validate_temperature(temperature)?);
+    } else if let Some(temperature) = config.temperature {
         // Validate the config file temperature as well
-        config.temperature = validate_temperature(config.temperature)?;
+        config.temperature = Some(validate_temperature(temperature)?);
     }
+    // If temperature is None in both config and args, leave it as None to use LLM default
 
     if let Some(timeout) = args.timeout {
         debug!("Overriding timeout with command line argument: {timeout}s");
@@ -258,7 +261,7 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
     }
 
     info!(
-        "Final configuration: model={}, base_url={}, temperature={}, timeout={}s",
+        "Final configuration: model={}, base_url={}, temperature={:?}, timeout={}s",
         config.model, config.base_url, config.temperature, config.timeout_secs
     );
     if config.api_key.is_some() {
@@ -406,7 +409,7 @@ async fn stream_response(
 
     // Enhanced logging for debugging - log full request details
     trace!("=== SERVICE CALL DETAILS ===");
-    trace!("URL: {}", url);
+    trace!("URL: {url}");
     trace!(
         "Request Body: {}",
         serde_json::to_string_pretty(&request)
@@ -419,7 +422,7 @@ async fn stream_response(
         headers_log.push_str("Authorization: Bearer ***, ");
     }
     headers_log.push_str("Content-Type: application/json");
-    trace!("{}", headers_log);
+    trace!("{headers_log}");
     trace!("=== END SERVICE CALL DETAILS ===");
 
     info!("Sending streaming request to API");
@@ -471,7 +474,7 @@ async fn stream_response(
         let text = std::str::from_utf8(&chunk)
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
         debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
-        trace!("Chunk {} content: {:?}", chunk_count, text);
+        trace!("Chunk {chunk_count} content: {text:?}");
         incomplete.push_str(text);
     } else {
         return Err(anyhow::anyhow!("Stream ended before any data was received"));
@@ -485,7 +488,7 @@ async fn stream_response(
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
 
         debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
-        trace!("Chunk {} content: {:?}", chunk_count, text);
+        trace!("Chunk {chunk_count} content: {text:?}");
         incomplete.push_str(text);
 
         // Process complete lines only
