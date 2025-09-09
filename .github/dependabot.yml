@@ -3,4 +3,6 @@
       - package-ecosystem: "cargo"
         directory: "/"
         schedule:
-          interval: "weekly"
+            interval: "monthly"
+            day: "monday"
+            time: "00:00"
