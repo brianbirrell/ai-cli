@@ -13,6 +13,8 @@ env:
 jobs:
   test-development:
     name: Test Development
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
