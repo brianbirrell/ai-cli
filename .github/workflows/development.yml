@@ -46,6 +46,8 @@ jobs:
 
   build-pre-release:
     name: Build Pre-Release
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/development' && github.event_name == 'push'
     timeout-minutes: 20
