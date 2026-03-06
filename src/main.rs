@@ -15,9 +15,9 @@ mod aggregation;
 mod chunk_processor;
 mod input_stream;
 
-pub(crate) use chunk_processor::{process_large_input, should_use_chunked_mode};
 #[cfg(test)]
 pub(crate) use chunk_processor::render_chunk_prompt;
+pub(crate) use chunk_processor::{process_large_input, should_use_chunked_mode};
 #[cfg(test)]
 pub(crate) use input_stream::InputChunker;
 
