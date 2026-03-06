@@ -17,6 +17,7 @@ async fn test_read_empty_stdinput() {
         version: false,
         temperature: None,
         timeout: None,
+        input_mode: None,
     };
 
     assert!(args.files.is_empty());
@@ -39,6 +40,7 @@ async fn test_read_from_file() {
         version: false,
         temperature: None,
         timeout: None,
+        input_mode: None,
     };
 
     let input = read_input(&args).await.unwrap();
@@ -57,6 +59,7 @@ async fn test_read_with_prompt() {
         version: false,
         temperature: None,
         timeout: None,
+        input_mode: None,
     };
 
     // Note: This test would need proper stdin mocking to work correctly
@@ -105,6 +108,7 @@ fn test_version_flag_parsing() {
         version: true,
         temperature: None,
         timeout: None,
+        input_mode: None,
     };
 
     assert!(args.version);
@@ -119,6 +123,7 @@ fn test_version_flag_parsing() {
         version: false,
         temperature: None,
         timeout: None,
+        input_mode: None,
     };
 
     assert!(!args.version);
@@ -143,6 +148,9 @@ fn test_config_defaults() {
     let config = AppConfig::default();
     assert_eq!(config.temperature, None);
     assert_eq!(config.timeout_secs, 300);
+    assert_eq!(config.input_mode, InputMode::Auto);
+    assert_eq!(config.chunk_size_chars, 16_000);
+    assert_eq!(config.chunk_overlap_chars, 1_000);
 }
 
 #[test]
@@ -155,6 +163,94 @@ fn test_config_without_temperature() {
         default_prompt: None,
         temperature: None, // This should be allowed now
         timeout_secs: 300,
+        input_mode: InputMode::Auto,
+        chunk_size_chars: 16_000,
+        chunk_overlap_chars: 1_000,
+        max_chunks: 0,
+        auto_chunk_threshold_chars: 50_000,
+        aggregate_chunks: true,
+        chunk_prompt_file: None,
     };
     assert_eq!(config.temperature, None);
+}
+
+#[test]
+fn test_validate_chunk_settings() {
+    let mut config = AppConfig::default();
+    assert!(validate_chunk_settings(&config).is_ok());
+
+    config.chunk_size_chars = 0;
+    assert!(validate_chunk_settings(&config).is_err());
+
+    let mut config = AppConfig::default();
+    config.chunk_overlap_chars = config.chunk_size_chars;
+    assert!(validate_chunk_settings(&config).is_err());
+}
+
+#[test]
+fn test_should_use_chunked_mode_off() {
+    let args = Args {
+        files: vec![],
+        prompt: None,
+        model: None,
+        base_url: None,
+        api_key: None,
+        verbose: 0,
+        version: false,
+        temperature: None,
+        timeout: None,
+        input_mode: None,
+    };
+
+    let mut config = AppConfig::default();
+    config.input_mode = InputMode::Off;
+    assert!(!should_use_chunked_mode(&args, &config).unwrap());
+}
+
+#[test]
+fn test_should_use_chunked_mode_chunked() {
+    let args = Args {
+        files: vec![],
+        prompt: None,
+        model: None,
+        base_url: None,
+        api_key: None,
+        verbose: 0,
+        version: false,
+        temperature: None,
+        timeout: None,
+        input_mode: None,
+    };
+
+    let mut config = AppConfig::default();
+    config.input_mode = InputMode::Chunked;
+    assert!(should_use_chunked_mode(&args, &config).unwrap());
+}
+
+#[test]
+fn test_input_chunker_overlap() {
+    let mut chunker = InputChunker::new(5, 2);
+    chunker.push_str("abcdefghij");
+
+    let first = chunker.next_chunk(false).unwrap();
+    assert_eq!(first, "abcde");
+
+    let second = chunker.next_chunk(false).unwrap();
+    assert_eq!(second, "defgh");
+
+    let third = chunker.next_chunk(true).unwrap();
+    assert_eq!(third, "ghij");
+
+    assert!(chunker.next_chunk(true).is_none());
+}
+
+#[test]
+fn test_render_chunk_prompt_template() {
+    let template =
+        "chunk={{chunk_index}} prompt={{user_prompt}} prev={{rolling_summary}} text={{chunk_text}}";
+    let rendered = render_chunk_prompt(template, "summarize", "older", "new-data", 3);
+    assert_eq!(
+        rendered,
+        "chunk=3 prompt=summarize prev=older text=new-data"
+    );
 }
