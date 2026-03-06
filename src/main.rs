@@ -11,6 +11,16 @@ use std::{
 };
 use tokio_stream::StreamExt;
 
+mod aggregation;
+mod chunk_processor;
+mod input_stream;
+
+#[cfg(test)]
+pub(crate) use chunk_processor::render_chunk_prompt;
+pub(crate) use chunk_processor::{process_large_input, should_use_chunked_mode};
+#[cfg(test)]
+pub(crate) use input_stream::InputChunker;
+
 // Build-time constants
 const GIT_COMMIT_HASH: &str = env!("GIT_COMMIT_HASH", "unknown");
 const GIT_COMMIT_HASH_SHORT: &str = env!("GIT_COMMIT_HASH_SHORT", "unknown");
@@ -29,6 +39,15 @@ pub fn print_version() {
 }
 
 // Configuration structure
+#[derive(Clone, Debug, Default, Serialize, Deserialize, clap::ValueEnum, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum InputMode {
+    Off,
+    Chunked,
+    #[default]
+    Auto,
+}
+
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AppConfig {
     model: String,
@@ -38,6 +57,20 @@ struct AppConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     timeout_secs: u64,
+    #[serde(default = "default_input_mode")]
+    input_mode: InputMode,
+    #[serde(default = "default_chunk_size_chars")]
+    chunk_size_chars: usize,
+    #[serde(default = "default_chunk_overlap_chars")]
+    chunk_overlap_chars: usize,
+    #[serde(default)]
+    max_chunks: usize,
+    #[serde(default = "default_auto_chunk_threshold_chars")]
+    auto_chunk_threshold_chars: usize,
+    #[serde(default = "default_aggregate_chunks")]
+    aggregate_chunks: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunk_prompt_file: Option<PathBuf>,
 }
 
 impl AppConfig {
@@ -49,8 +82,35 @@ impl AppConfig {
             default_prompt: None,
             temperature: None, // Use LLM default temperature
             timeout_secs: 300, // 300 seconds default timeout
+            input_mode: default_input_mode(),
+            chunk_size_chars: default_chunk_size_chars(),
+            chunk_overlap_chars: default_chunk_overlap_chars(),
+            max_chunks: 0,
+            auto_chunk_threshold_chars: default_auto_chunk_threshold_chars(),
+            aggregate_chunks: default_aggregate_chunks(),
+            chunk_prompt_file: None,
         }
     }
+}
+
+fn default_input_mode() -> InputMode {
+    InputMode::Auto
+}
+
+fn default_chunk_size_chars() -> usize {
+    16_000
+}
+
+fn default_chunk_overlap_chars() -> usize {
+    1_000
+}
+
+fn default_auto_chunk_threshold_chars() -> usize {
+    50_000
+}
+
+fn default_aggregate_chunks() -> bool {
+    true
 }
 
 /// OpenAI Compatible API Client
@@ -101,6 +161,16 @@ pub struct Args {
         help = "Connection timeout in seconds until first chunk (default: 300)"
     )]
     timeout: Option<u64>,
+
+    /// Input processing mode
+    #[arg(
+        short = 'i',
+        long,
+        value_enum,
+        hide_possible_values = true,
+        help = "Input mode: off (single request), chunked (always chunk), auto (chunk large input) [default: auto]"
+    )]
+    input_mode: Option<InputMode>,
 }
 
 #[derive(Serialize)]
@@ -112,7 +182,7 @@ struct ChatCompletionRequest {
     temperature: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct ChatMessage {
     role: String,
     content: String,
@@ -173,41 +243,51 @@ pub async fn main() -> Result<()> {
     let client = Client::builder().build()?;
     debug!("HTTP client initialized with no global timeout");
 
-    // Read all input sources
-    info!("Reading input from files and/or stdin");
-    let input = read_input(&args).await?;
-    debug!("Input length: {} characters", input.len());
-
-    // Build the request
-    info!("Building request with configuration");
-    debug!(
-        "Using model: {}, base_url: {}, temperature: {:?}, first-chunk timeout: {}s",
-        config.model, config.base_url, config.temperature, config.timeout_secs
+    let use_chunked_mode = should_use_chunked_mode(&args, &config)?;
+    info!(
+        "Selected input mode: {:?} (chunked_processing={})",
+        config.input_mode, use_chunked_mode
     );
 
-    let request = ChatCompletionRequest {
-        model: config.model.clone(),
-        messages: vec![ChatMessage {
-            role: "user".to_string(),
-            content: input,
-        }],
-        stream: true,
-        temperature: config.temperature,
-    };
-    debug!("Request prepared with streaming enabled");
+    if use_chunked_mode {
+        process_large_input(&args, &config, &client).await?;
+    } else {
+        // Read all input sources
+        info!("Reading input from files and/or stdin");
+        let input = read_input(&args).await?;
+        debug!("Input length: {} characters", input.len());
 
-    // Send the request and stream the response, passing the api_key from config or args
-    info!("Sending request to API");
-    stream_response(
-        &client,
-        config.base_url.as_str(),
-        config.api_key.as_ref(),
-        request,
-        config.timeout_secs,
-    )
-    .await?;
-    println!(); // Print a newline at the end for clean output
-    info!("Response streaming completed");
+        // Build the request
+        info!("Building request with configuration");
+        debug!(
+            "Using model: {}, base_url: {}, temperature: {:?}, first-chunk timeout: {}s",
+            config.model, config.base_url, config.temperature, config.timeout_secs
+        );
+
+        let request = ChatCompletionRequest {
+            model: config.model.clone(),
+            messages: vec![ChatMessage {
+                role: "user".to_string(),
+                content: input,
+            }],
+            stream: true,
+            temperature: config.temperature,
+        };
+        debug!("Request prepared with streaming enabled");
+
+        // Send the request and stream the response, passing the api_key from config or args
+        info!("Sending request to API");
+        stream_response(
+            &client,
+            config.base_url.as_str(),
+            config.api_key.as_ref(),
+            request,
+            config.timeout_secs,
+        )
+        .await?;
+        println!(); // Print a newline at the end for clean output
+        info!("Response streaming completed");
+    }
 
     Ok(())
 }
@@ -260,9 +340,25 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
         config.timeout_secs = timeout;
     }
 
+    if let Some(input_mode) = &args.input_mode {
+        debug!("Overriding input_mode with command line argument: {input_mode:?}");
+        config.input_mode = input_mode.clone();
+    }
+
+    validate_chunk_settings(&config)?;
+
     info!(
-        "Final configuration: model={}, base_url={}, temperature={:?}, timeout={}s",
-        config.model, config.base_url, config.temperature, config.timeout_secs
+        "Final configuration: model={}, base_url={}, temperature={:?}, timeout={}s, input_mode={:?}, chunk_size={}, chunk_overlap={}, max_chunks={}, auto_threshold={}, aggregate_chunks={}",
+        config.model,
+        config.base_url,
+        config.temperature,
+        config.timeout_secs,
+        config.input_mode,
+        config.chunk_size_chars,
+        config.chunk_overlap_chars,
+        config.max_chunks,
+        config.auto_chunk_threshold_chars,
+        config.aggregate_chunks
     );
     if config.api_key.is_some() {
         debug!("API key is configured");
@@ -270,6 +366,25 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
         debug!("No API key configured");
     }
     Ok(config)
+}
+
+fn validate_chunk_settings(config: &AppConfig) -> Result<()> {
+    if config.chunk_size_chars == 0 {
+        return Err(anyhow::anyhow!("chunk_size_chars must be greater than 0"));
+    }
+    if config.chunk_overlap_chars >= config.chunk_size_chars {
+        return Err(anyhow::anyhow!(
+            "chunk_overlap_chars ({}) must be smaller than chunk_size_chars ({})",
+            config.chunk_overlap_chars,
+            config.chunk_size_chars
+        ));
+    }
+    if config.auto_chunk_threshold_chars == 0 {
+        return Err(anyhow::anyhow!(
+            "auto_chunk_threshold_chars must be greater than 0"
+        ));
+    }
+    Ok(())
 }
 
 // Load configuration from config file
@@ -389,6 +504,26 @@ async fn stream_response(
     request: ChatCompletionRequest,
     first_chunk_timeout_secs: u64,
 ) -> Result<()> {
+    stream_response_collect(
+        client,
+        base_url,
+        api_key,
+        request,
+        first_chunk_timeout_secs,
+        true,
+    )
+    .await?;
+    Ok(())
+}
+
+async fn stream_response_collect(
+    client: &Client,
+    base_url: &str,
+    api_key: Option<&String>,
+    request: ChatCompletionRequest,
+    first_chunk_timeout_secs: u64,
+    print_output: bool,
+) -> Result<String> {
     // Construct the full URL
     let url = if base_url.ends_with('/') {
         format!("{}/chat/completions", base_url.trim_end_matches('/'))
@@ -456,6 +591,7 @@ async fn stream_response(
     let mut stream = response.bytes_stream();
 
     let mut incomplete = String::new();
+    let mut collected_output = String::new();
     let mut chunk_count = 0;
 
     info!("Starting to stream response");
@@ -501,8 +637,11 @@ async fn stream_response(
                         Ok(response) => {
                             for choice in &response.choices {
                                 if let Some(content) = choice.delta.content.as_ref() {
-                                    print!("{content}");
-                                    io::stdout().flush()?;
+                                    collected_output.push_str(content);
+                                    if print_output {
+                                        print!("{content}");
+                                        io::stdout().flush()?;
+                                    }
                                 }
                             }
                         }
@@ -527,7 +666,7 @@ async fn stream_response(
     if !incomplete.is_empty() {
         debug!("Remaining incomplete data: {incomplete}");
     }
-    Ok(())
+    Ok(collected_output)
 }
 
 #[cfg(test)]

@@ -79,6 +79,9 @@ ai-cli --base-url "https://api.openai.com/v1" --api-key "your-key" -p "Hello"
 
 # Control temperature and timeout
 ai-cli --temperature 0.3 --timeout 60 -p "Write a creative story"
+
+# Control input processing mode
+ai-cli -i auto -p "Summarize this data" < large_input.txt
 ```
 
 **Command line options:**  
@@ -91,6 +94,7 @@ All options are optional _except_ for `-p, --prompt`, which is required.
 - `--api-key <key>` (optional): API key for authentication, if needed
 - `--temperature <float>` (optional): LLM temperature between 0.0 (deterministic) and 2.0 (creative)
 - `--timeout <secs>` (optional): Connection timeout in seconds until first chunk (default: 300)
+- `-i, --input-mode <off|chunked|auto>` (optional): Input processing mode (default: auto)
 - `-v, --verbose` (optional): Enable verbose logging (use -v for basic debug, -vv for detailed request/response info)
 - `--version` (optional): Show version information
 
@@ -106,6 +110,13 @@ api_key = "your-api-key-here"
 default_prompt = "You are a helpful assistant."
 temperature = 0.7  # Optional: omit to use LLM's default temperature
 timeout_secs = 300  # Optional: connection timeout in seconds (default: 300)
+input_mode = "auto"  # Optional: off, chunked, auto
+chunk_size_chars = 16000  # Optional: chunk size for large input mode
+chunk_overlap_chars = 1000  # Optional: overlap between chunks
+max_chunks = 0  # Optional: 0 means unlimited
+auto_chunk_threshold_chars = 50000  # Optional: auto mode threshold
+aggregate_chunks = true  # Optional: run final synthesis pass over chunk outputs
+# chunk_prompt_file = "~/path/to/chunk_prompt.txt"  # Optional: custom chunk prompt template
 ```
 
 Command-line arguments will override config file values.
