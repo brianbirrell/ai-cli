@@ -22,6 +22,6 @@ dirs = "6.0"  # For finding configuration directory
 toml = "0.9"  # For reading TOML config files
 configparser = "3.0"  # Or use serpent if you prefer different config format
 libc = "0.2"
-fs = "0.0.5"
+# fs = "0.0.5"  # REMOVED: depended on bytes 0.4.x
 log = "0.4"  # For structured logging
 env_logger = "0.11"  # For logging implementation
