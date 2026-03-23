@@ -586,7 +586,7 @@ async fn stream_response_collect(
     // It is created here (after building the request but before sending) so
     // that it is visible during both the network round-trip and the wait for
     // the first streaming chunk.
-    let spinner = Spinner::new("Thinking...", show_progress);
+    let mut spinner = Spinner::new("Thinking...", show_progress);
 
     let response = request_builder
         .send()

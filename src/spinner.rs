@@ -1,6 +1,11 @@
-use indicatif::{ProgressBar, ProgressStyle};
-use std::io::IsTerminal;
-use std::time::Duration;
+use std::{
+    io::{IsTerminal, Write},
+    sync::mpsc,
+    time::Duration,
+};
+
+const TICK_MS: u64 = 100;
+const FRAMES: &[char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 /// Activity spinner that writes to stderr.
 ///
@@ -8,7 +13,9 @@ use std::time::Duration;
 /// (i.e. not piped or redirected) and progress output has not been
 /// suppressed via `--no-progress`.
 pub struct Spinner {
-    bar: Option<ProgressBar>,
+    /// Dropping or taking the sender signals the spinner thread to stop.
+    cancel_tx: Option<mpsc::SyncSender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Spinner {
@@ -18,27 +25,63 @@ impl Spinner {
     /// not a terminal, so output piped to a file or another process is
     /// never disturbed.
     pub fn new(message: &str, enabled: bool) -> Self {
-        if enabled && std::io::stderr().is_terminal() {
-            let bar = ProgressBar::new_spinner();
-            bar.set_style(
-                ProgressStyle::default_spinner()
-                    .template("{spinner:.cyan} {msg}")
-                    .unwrap_or_else(|_| ProgressStyle::default_spinner()),
-            );
-            bar.set_message(message.to_string());
-            bar.enable_steady_tick(Duration::from_millis(100));
-            Self { bar: Some(bar) }
-        } else {
-            Self { bar: None }
+        if !enabled || !std::io::stderr().is_terminal() {
+            return Self {
+                cancel_tx: None,
+                thread: None,
+            };
+        }
+
+        // capacity=1 so the implicit drop-send in finish_and_clear never blocks
+        let (tx, rx) = mpsc::sync_channel::<()>(1);
+        let msg = message.to_string();
+
+        let handle = std::thread::spawn(move || {
+            let stderr = std::io::stderr();
+            let mut idx = 0usize;
+
+            loop {
+                let frame = FRAMES[idx % FRAMES.len()];
+                {
+                    let mut err = stderr.lock();
+                    let _ = write!(err, "\r{} {}", frame, msg);
+                    let _ = err.flush();
+                }
+                idx += 1;
+
+                // Wait for the next tick or a cancel/disconnect signal.
+                match rx.recv_timeout(Duration::from_millis(TICK_MS)) {
+                    Ok(_) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                }
+            }
+
+            // Erase the spinner line so subsequent output starts cleanly.
+            {
+                let mut err = stderr.lock();
+                let _ = write!(err, "\r{}\r", " ".repeat(80));
+                let _ = err.flush();
+            }
+        });
+
+        Self {
+            cancel_tx: Some(tx),
+            thread: Some(handle),
         }
     }
 
-    /// Remove the spinner from the terminal.
+    /// Stop the spinner and clear it from the terminal.
     ///
-    /// Safe to call multiple times; subsequent calls are no-ops.
-    pub fn finish_and_clear(&self) {
-        if let Some(bar) = &self.bar {
-            bar.finish_and_clear();
+    /// **Blocks** until the spinner thread has exited, which guarantees the
+    /// terminal line is fully erased before this call returns. Safe to call
+    /// multiple times — subsequent calls are no-ops.
+    pub fn finish_and_clear(&mut self) {
+        // Dropping the sender causes recv_timeout in the thread to return
+        // `Disconnected`, which causes it to break, clear the line, and exit.
+        drop(self.cancel_tx.take());
+        if let Some(handle) = self.thread.take() {
+            // Joining ensures the terminal clear has happened before we return.
+            let _ = handle.join();
         }
     }
 }
@@ -56,17 +99,23 @@ mod tests {
     #[test]
     fn test_spinner_disabled() {
         // When disabled the spinner is a no-op and should not panic.
-        let spinner = Spinner::new("working...", false);
+        let mut spinner = Spinner::new("working...", false);
         spinner.finish_and_clear();
     }
 
     #[test]
     fn test_spinner_no_terminal() {
         // In CI / test environments stderr is not a terminal, so the
-        // internal ProgressBar should be None regardless of `enabled`.
-        let spinner = Spinner::new("working...", true);
-        // We cannot assert stderr.is_terminal() here (it depends on the
-        // runner), but we can verify the public API doesn't panic.
+        // internal thread should not be spawned regardless of `enabled`.
+        let mut spinner = Spinner::new("working...", true);
+        spinner.finish_and_clear();
+    }
+
+    #[test]
+    fn test_spinner_finish_twice() {
+        // finish_and_clear should be safe to call multiple times.
+        let mut spinner = Spinner::new("working...", false);
+        spinner.finish_and_clear();
         spinner.finish_and_clear();
     }
 }
