@@ -18,6 +18,7 @@ async fn test_read_empty_stdinput() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     assert!(args.files.is_empty());
@@ -41,6 +42,7 @@ async fn test_read_from_file() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     let input = read_input(&args).await.unwrap();
@@ -60,6 +62,7 @@ async fn test_read_with_prompt() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     // Note: This test would need proper stdin mocking to work correctly
@@ -109,6 +112,7 @@ fn test_version_flag_parsing() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     assert!(args.version);
@@ -124,6 +128,7 @@ fn test_version_flag_parsing() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     assert!(!args.version);
@@ -170,6 +175,7 @@ fn test_config_without_temperature() {
         auto_chunk_threshold_chars: 50_000,
         aggregate_chunks: true,
         chunk_prompt_file: None,
+        no_progress: false,
     };
     assert_eq!(config.temperature, None);
 }
@@ -200,6 +206,7 @@ fn test_should_use_chunked_mode_off() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     let mut config = AppConfig::default();
@@ -220,6 +227,7 @@ fn test_should_use_chunked_mode_chunked() {
         temperature: None,
         timeout: None,
         input_mode: None,
+        no_progress: false,
     };
 
     let mut config = AppConfig::default();
@@ -253,4 +261,42 @@ fn test_render_chunk_prompt_template() {
         rendered,
         "chunk=3 prompt=summarize prev=older text=new-data"
     );
+}
+
+/// Helper: create a default [`Args`] with all optional fields set to their
+/// zero value.  Individual tests can override just the fields they care about.
+fn default_test_args() -> Args {
+    Args {
+        files: vec![],
+        prompt: None,
+        model: None,
+        base_url: None,
+        api_key: None,
+        verbose: 0,
+        version: false,
+        temperature: None,
+        timeout: None,
+        input_mode: None,
+        no_progress: false,
+    }
+}
+
+#[test]
+fn test_no_progress_default() {
+    // The default config should have no_progress=false (spinner enabled).
+    let config = AppConfig::default();
+    assert!(!config.no_progress);
+}
+
+#[test]
+fn test_no_progress_flag_parsing() {
+    // Verify that the no_progress field is correctly set on Args.
+    let args_with_flag = Args {
+        no_progress: true,
+        ..default_test_args()
+    };
+    assert!(args_with_flag.no_progress);
+
+    let args_without_flag = default_test_args();
+    assert!(!args_without_flag.no_progress);
 }

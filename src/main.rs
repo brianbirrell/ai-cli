@@ -3,6 +3,7 @@ use clap::Parser;
 use log::{debug, info, trace};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use spinner::Spinner;
 use std::{
     fs,
     fs::File,
@@ -14,6 +15,7 @@ use tokio_stream::StreamExt;
 mod aggregation;
 mod chunk_processor;
 mod input_stream;
+mod spinner;
 
 #[cfg(test)]
 pub(crate) use chunk_processor::render_chunk_prompt;
@@ -71,6 +73,9 @@ struct AppConfig {
     aggregate_chunks: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     chunk_prompt_file: Option<PathBuf>,
+    /// Suppress the activity spinner (equivalent to --no-progress).
+    #[serde(default)]
+    no_progress: bool,
 }
 
 impl AppConfig {
@@ -89,6 +94,7 @@ impl AppConfig {
             auto_chunk_threshold_chars: default_auto_chunk_threshold_chars(),
             aggregate_chunks: default_aggregate_chunks(),
             chunk_prompt_file: None,
+            no_progress: false,
         }
     }
 }
@@ -171,6 +177,10 @@ pub struct Args {
         help = "Input mode: off (single request), chunked (always chunk), auto (chunk large input) [default: auto]"
     )]
     input_mode: Option<InputMode>,
+
+    /// Suppress the activity spinner (useful for cron jobs and scripts)
+    #[arg(long, help = "Disable the activity indicator (spinner)")]
+    no_progress: bool,
 }
 
 #[derive(Serialize)]
@@ -250,7 +260,7 @@ pub async fn main() -> Result<()> {
     );
 
     if use_chunked_mode {
-        process_large_input(&args, &config, &client).await?;
+        process_large_input(&args, &config, &client, !config.no_progress).await?;
     } else {
         // Read all input sources
         info!("Reading input from files and/or stdin");
@@ -283,6 +293,7 @@ pub async fn main() -> Result<()> {
             config.api_key.as_ref(),
             request,
             config.timeout_secs,
+            !config.no_progress,
         )
         .await?;
         println!(); // Print a newline at the end for clean output
@@ -343,6 +354,11 @@ async fn get_final_config(args: &Args) -> Result<AppConfig> {
     if let Some(input_mode) = &args.input_mode {
         debug!("Overriding input_mode with command line argument: {input_mode:?}");
         config.input_mode = input_mode.clone();
+    }
+
+    // --no-progress on the command line always wins over the config file value
+    if args.no_progress {
+        config.no_progress = true;
     }
 
     validate_chunk_settings(&config)?;
@@ -503,6 +519,7 @@ async fn stream_response(
     api_key: Option<&String>,
     request: ChatCompletionRequest,
     first_chunk_timeout_secs: u64,
+    show_progress: bool,
 ) -> Result<()> {
     stream_response_collect(
         client,
@@ -511,6 +528,7 @@ async fn stream_response(
         request,
         first_chunk_timeout_secs,
         true,
+        show_progress,
     )
     .await?;
     Ok(())
@@ -523,6 +541,7 @@ async fn stream_response_collect(
     request: ChatCompletionRequest,
     first_chunk_timeout_secs: u64,
     print_output: bool,
+    show_progress: bool,
 ) -> Result<String> {
     // Construct the full URL
     let url = if base_url.ends_with('/') {
@@ -562,6 +581,13 @@ async fn stream_response_collect(
 
     info!("Sending streaming request to API");
     debug!("Request builder prepared, sending HTTP POST request");
+
+    // Start spinner while waiting for the server to respond.
+    // It is created here (after building the request but before sending) so
+    // that it is visible during both the network round-trip and the wait for
+    // the first streaming chunk.
+    let spinner = Spinner::new("Thinking...", show_progress);
+
     let response = request_builder
         .send()
         .await
@@ -611,6 +637,9 @@ async fn stream_response_collect(
             .with_context(|| String::from("Failed to decode response as UTF-8"))?;
         debug!("Received chunk {}: {} bytes", chunk_count, chunk.len());
         trace!("Chunk {chunk_count} content: {text:?}");
+        // The server has started responding — clear the spinner so that the
+        // streamed output is not mixed with the spinner on the terminal.
+        spinner.finish_and_clear();
         incomplete.push_str(text);
     } else {
         return Err(anyhow::anyhow!("Stream ended before any data was received"));

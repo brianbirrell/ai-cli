@@ -95,6 +95,7 @@ All options are optional _except_ for `-p, --prompt`, which is required.
 - `--temperature <float>` (optional): LLM temperature between 0.0 (deterministic) and 2.0 (creative)
 - `--timeout <secs>` (optional): Connection timeout in seconds until first chunk (default: 300)
 - `-i, --input-mode <off|chunked|auto>` (optional): Input processing mode (default: auto)
+- `--no-progress` (optional): Disable the activity spinner (useful for cron jobs and scripts)
 - `-v, --verbose` (optional): Enable verbose logging (use -v for basic debug, -vv for detailed request/response info)
 - `--version` (optional): Show version information
 
@@ -117,6 +118,7 @@ max_chunks = 0  # Optional: 0 means unlimited
 auto_chunk_threshold_chars = 50000  # Optional: auto mode threshold
 aggregate_chunks = true  # Optional: run final synthesis pass over chunk outputs
 # chunk_prompt_file = "~/path/to/chunk_prompt.txt"  # Optional: custom chunk prompt template
+# no_progress = false  # Optional: set to true to disable the activity spinner globally
 ```
 
 Command-line arguments will override config file values.

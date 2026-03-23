@@ -62,6 +62,7 @@ pub(crate) async fn process_large_input(
     args: &Args,
     config: &AppConfig,
     client: &Client,
+    show_progress: bool,
 ) -> Result<()> {
     log::info!(
         "Processing large input in chunked mode with chunk_size={} and overlap={}",
@@ -107,6 +108,7 @@ pub(crate) async fn process_large_input(
                 &mut aggregate_inputs,
                 config,
                 client,
+                show_progress,
             )
             .await?;
         }
@@ -124,6 +126,7 @@ pub(crate) async fn process_large_input(
             &mut aggregate_inputs,
             config,
             client,
+            show_progress,
         )
         .await?;
     }
@@ -139,6 +142,7 @@ pub(crate) async fn process_large_input(
         &mut aggregate_inputs,
         config,
         client,
+        show_progress,
     )
     .await?;
 
@@ -171,6 +175,7 @@ pub(crate) async fn process_large_input(
             config.api_key.as_ref(),
             request,
             config.timeout_secs,
+            show_progress,
         )
         .await?;
     }
@@ -191,6 +196,7 @@ async fn process_reader_chunks<R: BufRead>(
     aggregate_inputs: &mut Vec<String>,
     config: &AppConfig,
     client: &Client,
+    show_progress: bool,
 ) -> Result<()> {
     if !flush_only {
         let mut line = String::new();
@@ -213,6 +219,7 @@ async fn process_reader_chunks<R: BufRead>(
                     aggregate_inputs,
                     config,
                     client,
+                    show_progress,
                 )
                 .await?;
                 if config.max_chunks > 0 && *chunk_index >= config.max_chunks {
@@ -236,6 +243,7 @@ async fn process_reader_chunks<R: BufRead>(
             aggregate_inputs,
             config,
             client,
+            show_progress,
         )
         .await?;
         if config.max_chunks > 0 && *chunk_index >= config.max_chunks {
@@ -259,6 +267,7 @@ async fn process_single_chunk(
     aggregate_inputs: &mut Vec<String>,
     config: &AppConfig,
     client: &Client,
+    show_progress: bool,
 ) -> Result<()> {
     if log::log_enabled!(log::Level::Debug) {
         debug!(
@@ -293,6 +302,7 @@ async fn process_single_chunk(
         request,
         config.timeout_secs,
         chunk_index,
+        show_progress,
     )
     .await?;
 
@@ -311,6 +321,7 @@ async fn stream_response_with_retries(
     request: ChatCompletionRequest,
     first_chunk_timeout_secs: u64,
     chunk_index: usize,
+    show_progress: bool,
 ) -> Result<String> {
     let max_retries = 2;
     let mut backoff_secs = 1u64;
@@ -330,6 +341,7 @@ async fn stream_response_with_retries(
             request_for_attempt,
             first_chunk_timeout_secs,
             true,
+            show_progress,
         )
         .await
         {
