@@ -44,6 +44,12 @@ impl Spinner {
                 let frame = FRAMES[idx % FRAMES.len()];
                 {
                     let mut err = stderr.lock();
+                    if idx == 0 {
+                        // Move to a fresh new line so the spinner never overlaps
+                        // text that was already printed on the current line (e.g.
+                        // a previous chunk's response in multi-chunk mode).
+                        let _ = writeln!(err);
+                    }
                     let _ = write!(err, "\r{} {}", frame, msg);
                     let _ = err.flush();
                 }
@@ -57,9 +63,10 @@ impl Spinner {
             }
 
             // Erase the spinner line so subsequent output starts cleanly.
+            // \x1b[2K erases the entire current line regardless of terminal width.
             {
                 let mut err = stderr.lock();
-                let _ = write!(err, "\r{}\r", " ".repeat(80));
+                let _ = write!(err, "\r\x1b[2K");
                 let _ = err.flush();
             }
         });
