@@ -2,6 +2,17 @@
 name = "ai-cli"
 version = "0.2.0"
 edition = "2021"
+description = "A command-line OpenAI-compatible API client for interacting with chat completion models"
+authors = ["Brian Birrell"]
+license = "MIT"
+
+[package.metadata.deb]
+section = "utils"
+priority = "optional"
+assets = [
+  ["target/release/ai-cli", "usr/bin/", "755"],
+  ["README.md", "usr/share/doc/ai-cli/README.md", "644"],
+]
 
 [build-dependencies]
 chrono = "0.4"
