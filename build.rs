@@ -15,17 +15,18 @@ fn main() {
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
         .unwrap_or_else(|_| "unknown".to_string());
 
-    // Check if there are uncommitted changes
+    // Refresh index metadata first to avoid false positives from stale stat info.
+    let _ = Command::new("git")
+        .args(["update-index", "-q", "--refresh"])
+        .output();
+
+    // Only tracked-file differences should mark a build as dirty.
+    // Untracked files are common in CI and should not affect release metadata.
     let dirty = Command::new("git")
-        .args(["diff-index", "--quiet", "HEAD", "--"])
+        .args(["diff-index", "--quiet", "--ignore-submodules=dirty", "HEAD", "--"])
         .output()
         .map(|output| !output.status.success())
-        .unwrap_or(false)
-        || Command::new("git")
-            .args(["ls-files", "--others", "--exclude-standard"])
-            .output()
-            .map(|output| !output.stdout.is_empty())
-            .unwrap_or(false);
+        .unwrap_or(false);
 
     // Get the build timestamp
     let build_time = chrono::Utc::now()

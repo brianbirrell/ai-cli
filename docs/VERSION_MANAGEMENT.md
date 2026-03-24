@@ -66,6 +66,23 @@ Fix:
 - Allow GitHub Actions to push commits to main.
 - Or disable branch protection for Actions pushes on this workflow.
 
+### Release binary shows `-dirty`
+
+Cause: Build metadata marked the tree as dirty at compile time.
+
+Notes:
+
+- `ai-cli --version` appends `-dirty` when tracked Git files differ from `HEAD` during `cargo build`.
+- Untracked files should not affect release metadata.
+
+Fix:
+
+- Ensure release workflow uses a clean checkout before build.
+- Add a pre-build cleanliness check:
+  - `git update-index -q --refresh`
+  - `git diff-index --quiet --ignore-submodules=dirty HEAD --`
+- Re-run the release workflow to rebuild artifacts.
+
 ## Manual fallback
 
 If automation is blocked by policy:

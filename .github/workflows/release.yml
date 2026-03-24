@@ -23,6 +23,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Needed for proper versioning
+        clean: true
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -54,6 +55,18 @@ jobs:
         fi
         
         echo "✅ Version sync verified: $TAG_VERSION"
+
+    - name: Verify checkout cleanliness
+      run: |
+        echo "Repository status before build:"
+        git status --porcelain=v1
+        git update-index -q --refresh
+        if ! git diff-index --quiet --ignore-submodules=dirty HEAD --; then
+          echo "❌ Checkout is not clean before build"
+          git status --porcelain=v1
+          exit 1
+        fi
+        echo "✅ Checkout clean"
         
     - name: Build release
       run: cargo build --release
