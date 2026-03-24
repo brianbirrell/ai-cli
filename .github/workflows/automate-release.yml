@@ -10,24 +10,23 @@ name: Automate Release
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   automate-release:
-    name: Create PR, Merge, and Create Release
+    name: Bump Version and Create Release
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       RELEASE_VERSION: ${{ github.event.inputs.version }}
       RELEASE_TAG: v${{ github.event.inputs.version }}
-      RELEASE_BRANCH: release/v${{ github.event.inputs.version }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
 
       - name: Validate version input
         run: |
@@ -45,189 +44,72 @@ jobs:
             exit 1
           fi
 
-      - name: Create release branch from development and bump version
+      - name: Update version and create release commit
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
 
-          git fetch origin development main
-          git checkout -B "$RELEASE_BRANCH" origin/development
-
           CURRENT_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
-          echo "Current Cargo.toml version: $CURRENT_VERSION"
+          echo "Current version in Cargo.toml: $CURRENT_VERSION"
           echo "Target release version: $RELEASE_VERSION"
 
           sed -i "s/^version = \".*\"/version = \"$RELEASE_VERSION\"/" Cargo.toml
 
           UPDATED_VERSION=$(grep '^version = ' Cargo.toml | cut -d'"' -f2)
           if [ "$UPDATED_VERSION" != "$RELEASE_VERSION" ]; then
-            echo "❌ Failed to update Cargo.toml version"
+            echo "❌ Failed to update Cargo.toml"
             exit 1
           fi
 
-          # Refresh Cargo.lock deterministically for the updated package version.
+          # Refresh Cargo.lock
           cargo check
 
           git add Cargo.toml Cargo.lock
+          git commit -m "Release v$RELEASE_VERSION"
+          git push origin main
 
-          if git diff --cached --quiet; then
-            echo "No version file changes detected; skipping commit"
-          else
-            git commit -m "Release v$RELEASE_VERSION"
-          fi
+          echo "✅ Version updated to $RELEASE_VERSION and pushed to main"
 
-          git push -u origin "$RELEASE_BRANCH" --force-with-lease
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Create or reuse release PR
-        id: release_pr
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const head = `${owner}:${process.env.RELEASE_BRANCH}`;
-            const base = 'main';
-            const title = `Release ${process.env.RELEASE_TAG}`;
-            const body = [
-              `Automated release PR for ${process.env.RELEASE_TAG}.`,
-              '',
-              'This PR was created by `.github/workflows/automate-release.yml`.',
-            ].join('\n');
+      - name: Build release
+        run: cargo build --release
 
-            const existing = await github.rest.pulls.list({
-              owner,
-              repo,
-              state: 'open',
-              head,
-              base,
-            });
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
 
-            let pr;
-            if (existing.data.length > 0) {
-              pr = existing.data[0];
-              core.info(`Using existing PR #${pr.number}: ${pr.html_url}`);
-            } else {
-              const created = await github.rest.pulls.create({
-                owner,
-                repo,
-                title,
-                head: process.env.RELEASE_BRANCH,
-                base,
-                body,
-                maintainer_can_modify: true,
-              });
-              pr = created.data;
-              core.info(`Created PR #${pr.number}: ${pr.html_url}`);
-            }
-
-            core.setOutput('number', String(pr.number));
-            core.setOutput('url', pr.html_url);
-
-      - name: Try automated PR approval
-        uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const pull_number = Number('${{ steps.release_pr.outputs.number }}');
-
-            await github.rest.pulls.createReview({
-              owner,
-              repo,
-              pull_number,
-              event: 'APPROVE',
-              body: `Approved automatically for ${process.env.RELEASE_TAG}`,
-            });
-
-            core.info(`Approved PR #${pull_number} with default token`);
-
-      - name: Merge release PR
-        id: merge_pr
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const pull_number = Number('${{ steps.release_pr.outputs.number }}');
-
-            for (let attempt = 1; attempt <= 20; attempt++) {
-              const pr = await github.rest.pulls.get({ owner, repo, pull_number });
-
-              if (pr.data.merged) {
-                core.info(`PR #${pull_number} is already merged.`);
-                return;
-              }
-
-              const mergeableState = pr.data.mergeable_state;
-              core.info(`Attempt ${attempt}: mergeable_state=${mergeableState}`);
-
-              if (['clean', 'has_hooks', 'unstable'].includes(mergeableState)) {
-                try {
-                  await github.rest.pulls.merge({
-                    owner,
-                    repo,
-                    pull_number,
-                    merge_method: 'squash',
-                    commit_title: `Release ${process.env.RELEASE_TAG}`,
-                    commit_message: `Automated merge for ${process.env.RELEASE_TAG}`,
-                  });
-                  core.info(`Merged PR #${pull_number}`);
-                  return;
-                } catch (error) {
-                  core.warning(`Merge attempt failed: ${error.message}`);
-                }
-              }
-
-              await new Promise((resolve) => setTimeout(resolve, 15000));
-            }
-
-            core.setFailed(`Could not merge PR #${pull_number}. Check branch protection, required checks, and approvals.`);
-
-      - name: Verify main branch version
+      - name: Build deb package
         run: |
-          git fetch origin main
-          MAIN_VERSION=$(git show origin/main:Cargo.toml | grep '^version = ' | cut -d'"' -f2)
-          echo "main branch Cargo.toml version: $MAIN_VERSION"
+          cargo deb --no-build
+          DEB_FILE=$(ls target/debian/*.deb | head -1)
+          cp "$DEB_FILE" ai-cli-v$RELEASE_VERSION-amd64.deb
 
-          if [ "$MAIN_VERSION" != "$RELEASE_VERSION" ]; then
-            echo "❌ Version mismatch on main branch after merge"
-            exit 1
-          fi
+      - name: Create release archives
+        run: |
+          mkdir -p artifacts
+          cp target/release/ai-cli artifacts/
+          cd artifacts
+          tar -czf ../ai-cli-v$RELEASE_VERSION-linux-x86_64.tar.gz *
+          cd ..
+          zip -r ai-cli-v$RELEASE_VERSION-linux-x86_64.zip artifacts/
 
-          echo "✅ main branch version matches release version"
+      - name: Verify artifacts
+        run: |
+          echo "Artifacts created:"
+          ls -lh ai-cli-*.tar.gz ai-cli-*.zip ai-cli-*.deb 2>/dev/null || echo "No artifacts found"
 
       - name: Create GitHub release
-        uses: actions/github-script@v7
+        uses: softprops/action-gh-release@v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const tag_name = process.env.RELEASE_TAG;
-
-            try {
-              const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag: tag_name });
-              core.info(`Release already exists for ${tag_name}: ${existing.data.html_url}`);
-              return;
-            } catch (error) {
-              if (error.status !== 404) {
-                throw error;
-              }
-            }
-
-            const release = await github.rest.repos.createRelease({
-              owner,
-              repo,
-              tag_name,
-              target_commitish: 'main',
-              name: `Release ${tag_name}`,
-              generate_release_notes: true,
-              draft: false,
-              prerelease: false,
-            });
-
-            core.info(`Created release: ${release.data.html_url}`);
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ env.RELEASE_TAG }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            ai-cli-v${{ env.RELEASE_VERSION }}-linux-x86_64.tar.gz
+            ai-cli-v${{ env.RELEASE_VERSION }}-linux-x86_64.zip
+            ai-cli-v${{ env.RELEASE_VERSION }}-amd64.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
