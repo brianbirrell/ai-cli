@@ -23,10 +23,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      uses: dtolnay/rust-toolchain@stable
         
     - name: Cache dependencies
       uses: actions/cache@v4
@@ -61,10 +58,7 @@ jobs:
         fetch-depth: 0
       
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      uses: dtolnay/rust-toolchain@stable
         
     - name: Cache dependencies
       uses: actions/cache@v4
@@ -86,6 +80,15 @@ jobs:
         
     - name: Build release
       run: cargo build --release
+
+    - name: Install cargo-deb
+      run: cargo install cargo-deb
+
+    - name: Build deb package
+      run: |
+        cargo deb --no-build
+        DEB_FILE=$(ls target/debian/*.deb | head -1)
+        cp "$DEB_FILE" ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-amd64.deb
         
     - name: Create pre-release archive
       run: |
@@ -110,6 +113,7 @@ jobs:
         path: |
           ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.tar.gz
           ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.zip
+          ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-amd64.deb
         retention-days: 30
 
   create-development-release:
@@ -153,6 +157,10 @@ jobs:
         fi
         if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-linux-x86_64.zip" ]; then
           echo "❌ Expected zip artifact not found"
+          exit 1
+        fi
+        if [ ! -f "artifacts/ai-cli-development-${{ steps.commit.outputs.commit_date }}-${{ steps.commit.outputs.short_sha }}-amd64.deb" ]; then
+          echo "❌ Expected deb artifact not found"
           exit 1
         fi
         echo "✅ All expected artifacts found"

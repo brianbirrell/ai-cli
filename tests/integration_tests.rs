@@ -25,7 +25,7 @@ mod integration_tests {
         use std::process::Command;
 
         let output = Command::new("cargo")
-            .args(&["run", "--", "--version"])
+            .args(["run", "--", "--version"])
             .output()
             .expect("Failed to run cargo");
 

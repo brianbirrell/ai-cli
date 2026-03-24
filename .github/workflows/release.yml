@@ -25,10 +25,7 @@ jobs:
         fetch-depth: 0  # Needed for proper versioning
       
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      uses: dtolnay/rust-toolchain@stable
         
     - name: Cache dependencies
       uses: actions/cache@v4
@@ -60,6 +57,16 @@ jobs:
         
     - name: Build release
       run: cargo build --release
+
+    - name: Install cargo-deb
+      run: cargo install cargo-deb
+
+    - name: Build deb package
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        cargo deb --no-build
+        DEB_FILE=$(ls target/debian/*.deb | head -1)
+        cp "$DEB_FILE" ai-cli-v$VERSION-amd64.deb
         
     - name: Create release archives
       run: |
@@ -82,14 +89,19 @@ jobs:
         
     - name: Verify artifacts
       run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
         echo "Checking for release artifacts..."
-        ls -la *.tar.gz *.zip || echo "No artifacts found in current directory"
+        ls -la *.tar.gz *.zip *.deb || echo "No artifacts found in current directory"
         if [ ! -f "ai-cli-${{ github.ref_name }}-linux-x86_64.tar.gz" ]; then
           echo "❌ Expected tar.gz artifact not found"
           exit 1
         fi
         if [ ! -f "ai-cli-${{ github.ref_name }}-linux-x86_64.zip" ]; then
           echo "❌ Expected zip artifact not found"
+          exit 1
+        fi
+        if [ ! -f "ai-cli-v$VERSION-amd64.deb" ]; then
+          echo "❌ Expected deb artifact not found"
           exit 1
         fi
         echo "✅ All expected artifacts found"
@@ -100,6 +112,7 @@ jobs:
         files: |
           ai-cli-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
           ai-cli-${{ github.event.release.tag_name }}-linux-x86_64.zip
+          ai-cli-${{ github.event.release.tag_name }}-amd64.deb
         generate_release_notes: true
         draft: false
         prerelease: false
