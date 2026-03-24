@@ -9,21 +9,19 @@ Use `.github/workflows/automate-release.yml` with `workflow_dispatch`.
 ### What it automates
 
 1. Validates the provided version (`MAJOR.MINOR.PATCH`)
-2. Creates a release branch from `development`
-3. Updates `Cargo.toml` (and refreshes `Cargo.lock`)
-4. Opens a PR to `main`
-5. Approves the PR (if token permissions allow)
-6. Merges the PR to `main`
-7. Creates a GitHub Release with tag `vX.X.X`
-
-Publishing that release triggers `.github/workflows/release.yml` to produce production artifacts.
+2. Checks out main branch
+3. Updates `Cargo.toml` and refreshes `Cargo.lock`
+4. Commits and pushes version bump directly to main
+5. Builds release artifacts (binary, tar.gz, zip, deb)
+6. Creates a GitHub Release with tag `vX.X.X` and uploads artifacts
+7. GitHub release publication optionally triggers production workflows
 
 ## Required Configuration
 
 ### Required repository settings
 
-- GitHub Actions must have write access to contents and pull requests.
-- Branch protection rules on `main` must allow the configured automation path (approval + merge).
+- GitHub Actions must have write access to contents.
+- main branch should allow direct commits from GitHub Actions (no PR required).
 
 ## How to Run a Release
 
@@ -34,44 +32,46 @@ Publishing that release triggers `.github/workflows/release.yml` to produce prod
 
 Expected result:
 
-- PR is created and merged into `main`
-- `main` contains `version = "0.3.0"` in `Cargo.toml`
-- GitHub release `v0.3.0` is created
-- Production build workflow runs from the release event
+- main branch `Cargo.toml` contains `version = "0.3.0"`
+- main branch is pushed with release commit
+- Release tag `v0.3.0` is created
+- GitHub release `v0.3.0` is published with artifacts (tar.gz, zip, deb)
+- Any dependent workflows trigger from the release event
 
 ## Troubleshooting
 
-### Approval fails
+### Version validation fails
 
-Cause: The default `GITHUB_TOKEN` cannot satisfy review requirements.
-
-Fix:
-
-- Allow the GitHub Actions bot review to satisfy branch protection, or complete approval manually.
-- Confirm branch protection rules allow an automation-driven merge path.
-
-### Merge fails
-
-Cause: Required checks or required review policy not satisfied.
+Cause: Version format is not `MAJOR.MINOR.PATCH`.
 
 Fix:
 
-- Verify required status checks passed.
-- Verify approval requirements are met.
+- Provide version in format `1.2.3` (not `v1.2.3`, not `1.2.3-beta`, etc.)
 
-### Version or tag already exists
+### Tag already exists
 
-Cause: Requested version already released or tag already present.
+Cause: Release version was already created.
 
 Fix:
 
-- Run with a new version.
-- Or clean up the existing tag/release if it was created in error.
+- Use a new version number.
+- Or delete the existing tag and release if created in error.
+
+### Commit to main fails
+
+Cause: main branch has branch protection preventing direct commits.
+
+Fix:
+
+- Allow GitHub Actions to push commits to main.
+- Or disable branch protection for Actions pushes on this workflow.
 
 ## Manual fallback
 
-If automation is blocked by policy, manual flow remains:
+If automation is blocked by policy:
 
-1. Create/merge PR to `main` with version update.
-2. Create release tag `vX.X.X` in GitHub Releases.
-3. Let `.github/workflows/release.yml` build artifacts.
+1. Manually update `Cargo.toml` version on main.
+2. Manually commit and push to main.
+3. Run `cargo build --release` and create artifacts.
+4. Create a GitHub release with tag `vX.X.X` and upload artifacts manually.
+
