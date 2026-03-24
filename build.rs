@@ -23,7 +23,13 @@ fn main() {
     // Only tracked-file differences should mark a build as dirty.
     // Untracked files are common in CI and should not affect release metadata.
     let dirty = Command::new("git")
-        .args(["diff-index", "--quiet", "--ignore-submodules=dirty", "HEAD", "--"])
+        .args([
+            "diff-index",
+            "--quiet",
+            "--ignore-submodules=dirty",
+            "HEAD",
+            "--",
+        ])
         .output()
         .map(|output| !output.status.success())
         .unwrap_or(false);
