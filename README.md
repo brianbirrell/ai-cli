@@ -23,16 +23,25 @@ A command-line OpenAI-compatible API client, written in Rust, for interacting wi
 
 See also: [shell_gpt](https://github.com/TheR1D/shell_gpt), [ai-shell](https://github.com/BuilderIO/ai-shell)
 
+## What Is New In v0.3.0
+
+- Added large-input chunked processing with configurable input modes (`off`, `chunked`, `auto`)
+- Added activity spinner improvements and `--no-progress` option for script-friendly output
+- Added automated release workflow and Linux release packaging artifacts (`tar.gz`, `zip`, `deb`)
+- Updated CI workflows and dependencies for security and compatibility
+
 ## Release Automation
 
 This repository includes a GitHub Actions workflow that automates releases end to end:
 
-- Creates a release PR to `main` from `development`
-- Updates `Cargo.toml` version to the provided release version
-- Approves and merges the PR (when token permissions allow)
-- Creates a GitHub release tag in the format `vX.X.X`
+- Validates the provided SemVer release version
+- Updates `Cargo.toml` and `Cargo.lock` to the requested version
+- Runs project validation checks in CI
+- Pushes the release commit and creates a GitHub release tag in the format `vX.X.X`
 
 Run the `Automate Release` workflow from the Actions tab with a SemVer version input (for example, `0.3.0`).
+
+Current release: `v0.3.0`.
 
 For full details and required token/repo settings, see [docs/VERSION_MANAGEMENT.md](docs/VERSION_MANAGEMENT.md).
 

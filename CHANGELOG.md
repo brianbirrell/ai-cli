@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 0.3.0 (2026-03-23)
+
+Features:
+  - Implemented large dataset streaming support with chunked input processing, overlap handling, and optional aggregation pass -> [#84](https://github.com/brianbirrell/ai-cli/pull/84)
+  - Added configurable input processing mode (`off`, `chunked`, `auto`) and chunking settings in config -> [#84](https://github.com/brianbirrell/ai-cli/pull/84)
+  - Added terminal activity spinner with `--no-progress` support and TTY-safe behavior -> [#83](https://github.com/brianbirrell/ai-cli/pull/83)
+  - Added automated release workflow (`Automate Release`) with SemVer version validation and tag management -> [#84](https://github.com/brianbirrell/ai-cli/pull/84)
+  - Added automated Linux release packaging (`tar.gz`, `zip`, and `deb`) in CI workflows -> [#81](https://github.com/brianbirrell/ai-cli/pull/81)
+
+Security and CI:
+  - Added explicit workflow permissions to address code scanning alerts -> [#61](https://github.com/brianbirrell/ai-cli/pull/61), [#62](https://github.com/brianbirrell/ai-cli/pull/62), [#63](https://github.com/brianbirrell/ai-cli/pull/63)
+  - Updated deprecated GitHub Actions usage to current compatible actions and cache versions -> [#82](https://github.com/brianbirrell/ai-cli/pull/82)
+  - Enhanced automate-release workflow with additional validation checks and release flow improvements
+
+Dependencies:
+  - Removed `fs` dependency and updated lockfile/dependency set as part of modernization work -> [#79](https://github.com/brianbirrell/ai-cli/pull/79)
+  - Updated dependencies including `clap`, `serde`, `libc`, `mockito`, `log`, and `rustls-webpki`
+
+Documentation:
+  - Added large dataset streaming specification -> [docs/specs/LARGE_DATASET_STREAMING_SPEC.md](docs/specs/LARGE_DATASET_STREAMING_SPEC.md)
+  - Updated release automation guidance in README.md
+  - Updated version management guidance for the release process
+
 ## 0.2.0 (2025-09-01)
 
 Features:
