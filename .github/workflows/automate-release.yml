@@ -44,6 +44,9 @@ jobs:
             exit 1
           fi
 
+      - name: Install Rust toolchain (for version update validation)
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Update version and create release commit
         run: |
           git config user.email "action@github.com"
@@ -66,11 +69,22 @@ jobs:
 
           git add Cargo.toml Cargo.lock
           git commit -m "Release v$RELEASE_VERSION"
+
+          echo "✅ Version updated to $RELEASE_VERSION"
+
+      - name: Run tests before pushing
+        run: |
+          cargo test --verbose
+          cargo test --test integration_tests --verbose
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+
+      - name: Push to main
+        run: |
           git push origin main
+          echo "✅ Changes pushed to main"
 
-          echo "✅ Version updated to $RELEASE_VERSION and pushed to main"
-
-      - name: Install Rust toolchain
+      - name: Install Rust toolchain (for release build)
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build release
