@@ -23,6 +23,19 @@ A command-line OpenAI-compatible API client, written in Rust, for interacting wi
 
 See also: [shell_gpt](https://github.com/TheR1D/shell_gpt), [ai-shell](https://github.com/BuilderIO/ai-shell)
 
+## Release Automation
+
+This repository includes a GitHub Actions workflow that automates releases end to end:
+
+- Creates a release PR to `main` from `development`
+- Updates `Cargo.toml` version to the provided release version
+- Approves and merges the PR (when token permissions allow)
+- Creates a GitHub release tag in the format `vX.X.X`
+
+Run the `Automate Release` workflow from the Actions tab with a SemVer version input (for example, `0.3.0`).
+
+For full details and required token/repo settings, see [docs/VERSION_MANAGEMENT.md](docs/VERSION_MANAGEMENT.md).
+
 # Getting Started
 
 ## Prerequisites
