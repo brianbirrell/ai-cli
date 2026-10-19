@@ -1,28 +1,31 @@
-# Working on ai-cli from this environment
-
 ## Where things live
 
-- The repository is a **WSL** checkout at `/home/brian/git/ai-cli`.
-- The OpenCode server runs on **Windows**, so project files are addressed by
-  UNC path (`\\wsl.localhost\Ubuntu-Dev\home\brian\git\ai-cli\...`).
-- The Rust toolchain lives in WSL at `~/.cargo/bin` (cargo, rustc, rustfmt,
-  clippy). It is **not** on the default `PATH` of a non-login shell.
+- The repository is a POSIX checkout at `/home/brian/git/ai-cli`.
+- **Development is supported on POSIX platforms only: Linux and WSL.** A
+  Windows shell is not a supported development environment.
+- The Rust toolchain lives in `~/.cargo/bin` (cargo, rustc, rustfmt, clippy).
+  It is **not** on the default `PATH` of a non-login shell, so use a login
+  shell, or source `~/.cargo/env`.
 
 ## Running Rust commands
 
-Always shell out to WSL with a login shell so `~/.profile` sources
-`~/.cargo/env` and puts the toolchain on `PATH`:
-
 ```sh
-wsl -d Ubuntu-Dev -- bash -lc "cd /home/brian/git/ai-cli && cargo test"
+cd /home/brian/git/ai-cli
+cargo test
 ```
 
-Do not run `cargo`, `rustc`, or `rustfmt` directly from a Windows shell — they
-are not installed there.
+`cargo`, `rustc`, `rustfmt` and `cargo-clippy` are on the `PATH`. If they
+are not in a particular shell, use a login shell so `~/.profile` sources
+`~/.cargo/env`, or source it directly.
 
-The formatter is bridged automatically: `opencode.json` routes `.rs` files
-through `/home/brian/.opencode/bin/rustfmt-wsl`, which translates the UNC path
-into a WSL path before calling `rustfmt`.
+Formatting is handled by the built-in rustfmt formatter, which `opencode.json`
+enables. `rustfmt.toml` sets the edition, because rustfmt does not read it
+from `Cargo.toml` when it is run outside cargo. `cargo fmt` is unaffected and
+takes the edition from `Cargo.toml`.
+
+`gh` is authenticated for this repository, so `gh pr create`,
+`gh pr checks`, `gh run watch` and `gh issue create` are all available for
+preparing and monitoring a pull request.
 
 ## Project conventions (see `AGENTS.md` for the full list)
 
@@ -133,7 +136,7 @@ required flow is:
 **Never add or remove the `approved` label.** GitHub does not allow the
 author of a pull request to approve it, so the maintainer signals approval by
 adding that label, and the `Approve Pull Request` workflow turns it into the
-`Approved` status check the ruleset requires. Removing the label revokes the
+`Approved` status check the rulesets require. Removing the label revokes the
 approval. Adding the label is the maintainer's action alone.
 
 Also:
@@ -144,8 +147,3 @@ Also:
 - **Never push directly to `development` or `main`**, and never force-push or
   delete them.
 - **Never close someone else's pull request** unprompted.
-
-The `gh` CLI is authenticated for this repository, so `gh pr create`,
-`gh pr checks`, and `gh run watch` are all available for preparing and
-monitoring a pull request.
-

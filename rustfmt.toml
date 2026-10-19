@@ -1,0 +1,8 @@
+# Keep the edition in step with the `edition` in Cargo.toml.
+#
+# rustfmt defaults to edition 2015 when it is run outside cargo, and it does
+# not read the edition from Cargo.toml. Without this, running `rustfmt` on a
+# file directly fails on this crate's `async fn` code.
+#
+# `cargo fmt` passes the edition from Cargo.toml itself and is unaffected.
+edition = "2021"
