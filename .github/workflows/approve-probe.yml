@@ -1,0 +1,20 @@
+name: Approve Probe
+on:
+  pull_request:
+    types: [labeled]
+permissions:
+  pull-requests: write
+  contents: read
+  checks: write
+jobs:
+  approve:
+    if: contains(github.event.pull_request.labels.*.name, 'approved')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record an Approved check run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          printf '{"name":"Approved","head_sha":"%s","status":"completed","conclusion":"success"}' "$SHA" > /tmp/check.json
+          gh api -X POST "repos/${{ github.repository }}/check-runs" --input /tmp/check.json --jq '.conclusion'
