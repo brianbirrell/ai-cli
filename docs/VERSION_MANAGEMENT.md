@@ -27,7 +27,7 @@ request, and then published with a tag.
 - Generate the changelog section from the commit history:
 
   ```sh
-  python3 scripts/generate_changelog.py 0.3.2
+  cargo run --example generate_changelog -- 0.3.2
   ```
 
   The generator reads the commits between the previous release tag and
@@ -36,8 +36,12 @@ request, and then published with a tag.
   empty section or to duplicate an existing version.
 
   Useful options: `--dry-run` to preview, `--from-tag` to override the
-  previous release tag, `--date` to set the release date, and `--ref` to read
-  history from a branch other than `origin/development`.
+  previous release tag, `--date` to set the release date, and `--branch` to
+  read history from a branch other than `origin/development`.
+
+  The generator is a cargo example, so it needs nothing beyond the Rust
+  toolchain and `git`. It is not installed by `cargo install` and is not part
+  of the release artifacts.
 
   `CHANGELOG.md` is only touched here, when a release is being cut. It is not
   updated for ordinary changes.

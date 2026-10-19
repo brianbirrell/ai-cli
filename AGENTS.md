@@ -14,7 +14,8 @@ the guidelines below so that the development experience continues to work smooth
   section 2, *Branch Protection and Review Requirements*.
 * **Update documentation** including README.md and markdown files in the 'docs' directory.
 * **Do _not_ update CHANGELOG.md** unless a release is being prepared, and then
-  only by running `scripts/generate_changelog.py`. See section 3, *Changelog*.
+  only by running `cargo run --example generate_changelog --`. See section 3,
+  *Changelog*.
 * **Always use `cargo run` for testing the CLI application** while iterating on the
   code. This ensures proper dependency resolution and incremental compilation.
 * **Use `cargo check` for quick syntax checking** without full compilation.
@@ -75,7 +76,7 @@ The release preparation steps are:
 
 1. Bump `version` in `Cargo.toml` and refresh `Cargo.lock` with `cargo check`.
 2. Generate the changelog section with
-   `python3 scripts/generate_changelog.py <version>` (see section 3).
+   `cargo run --example generate_changelog -- <version>` (see section 3).
 3. Update the README release notes and the current release line.
 4. Commit on `development`, open a pull request to `main`, and wait for review.
 5. Merge the pull request with a squash merge.
@@ -104,7 +105,7 @@ maintainer to reconcile them rather than pushing to `development` yourself.
   `development` branch:
 
   ```sh
-  python3 scripts/generate_changelog.py <version>
+  cargo run --example generate_changelog -- <version>
   ```
 
   The generator reads the commits between the previous release tag and
@@ -112,6 +113,11 @@ maintainer to reconcile them rather than pushing to `development` yourself.
   section as `## <version> (<date>)`. Use `--dry-run` to preview and
   `--from-tag` if the previous release tag needs overriding. It refuses to
   write an empty section or to duplicate an existing version.
+
+  The generator lives in `examples/generate_changelog.rs`. Examples are not
+  installed by `cargo install` and are not part of the release artifacts, so
+  it adds no runtime dependency and no extra binary to ship. It does not
+  require anything beyond the Rust toolchain and `git`.
 
 * **At all other times, do not touch `CHANGELOG.md`.** It is not updated for
   ordinary changes, documentation updates, dependency bumps, or pull request

@@ -51,7 +51,7 @@ into a WSL path before calling `rustfmt`.
 - When a release is requested, generate the section rather than writing it:
 
   ```sh
-  python3 scripts/generate_changelog.py <version>
+  cargo run --example generate_changelog -- <version>
   ```
 
   It reads the commits between the previous release tag and `origin/development`,
