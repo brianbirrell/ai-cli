@@ -41,6 +41,43 @@ into a WSL path before calling `rustfmt`.
   only by running the generator. See the changelog policy below.
 - Do not create a pull request unless it is explicitly requested.
 
+## Deferred fixes and issue proposals
+
+When you find something that ought to be fixed but is not part of the current
+task, do not fix it silently and do not file an issue on your own initiative.
+
+Present it in this shape and ask whether to file it, then wait:
+
+> **Proposed issue**
+>
+> **Title:** `[BUG] one line summary of the problem`
+> **Labels:** `bug`
+> **Where:** `path/to/file:line`, or the workflow file
+>
+> **Problem:** what is wrong, in one or two sentences.
+>
+> **Impact:** who is affected and how.
+>
+> **Suggested fix:** the concrete change, with the code or the commands.
+>
+> **Verification:** how to confirm the fix works.
+
+Once the maintainer approves, file it with:
+
+```sh
+gh issue create --title "<title>" --label <label> --body-file <body>
+```
+
+- **Never file an issue without explicit approval.** A recommendation is not
+  an instruction.
+- **Never fix a deferred problem as a side effect of another task.**
+- One issue per problem. Do not bundle unrelated findings.
+- Title prefixes `[BUG]`, `[FEATURE]`, `[DOCS]`, `[PERF]`, with the matching
+  labels `bug`, `enhancement`, `documentation`, `performance`.
+- Check what is already tracked first: `gh issue list --state all` and the
+  "Known Issues" section of `docs/VERSION_MANAGEMENT.md`. If a problem is
+  already filed, refer to that issue instead of proposing a new one.
+
 ## Changelog policy
 
 `CHANGELOG.md` is **generated, not written by hand**.

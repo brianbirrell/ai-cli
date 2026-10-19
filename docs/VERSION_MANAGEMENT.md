@@ -147,7 +147,8 @@ created.
 - **`automate-release.yml` cannot push to `main`.** See the section above.
 - **Archive layouts differ.** The `tar.gz` contains a flat `ai-cli` binary
   while the `zip` contains `artifacts/ai-cli`, because the workflow tars the
-  contents of `artifacts/` but zips the directory itself.
+  contents of `artifacts/` but zips the directory itself. Tracked as
+  [#102](https://github.com/brianbirrell/ai-cli/issues/102).
 
 ## Troubleshooting
 

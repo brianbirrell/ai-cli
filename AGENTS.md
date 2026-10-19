@@ -16,6 +16,9 @@ the guidelines below so that the development experience continues to work smooth
 * **Do _not_ update CHANGELOG.md** unless a release is being prepared, and then
   only by running `cargo run --example generate_changelog --`. See section 3,
   *Changelog*.
+* **Present problems that need fixing as proposed issues** and wait for the
+  maintainer to approve filing them. See section 4, *Deferred Fixes and Issue
+  Proposals*.
 * **Always use `cargo run` for testing the CLI application** while iterating on the
   code. This ensures proper dependency resolution and incremental compilation.
 * **Use `cargo check` for quick syntax checking** without full compilation.
@@ -177,7 +180,53 @@ reference, and to the commit otherwise. The generator is the single source of
 truth, so a hand written entry that it does not produce will be lost on the
 next release.
 
-## 4. Keep Dependencies in Sync
+## 4. Deferred Fixes and Issue Proposals
+
+When you find something that ought to be fixed but is not part of the current
+task, do not fix it silently and do not file an issue on your own initiative.
+
+Present it as a proposed issue and let the maintainer decide:
+
+> **Proposed issue**
+>
+> **Title:** `[BUG] one line summary of the problem`
+> **Labels:** `bug`
+> **Where:** `path/to/file:line`, or the workflow file
+>
+> **Problem:** what is wrong, in one or two sentences.
+>
+> **Impact:** who is affected and how.
+>
+> **Suggested fix:** the concrete change, with the code or the commands.
+>
+> **Verification:** how to confirm the fix works.
+
+Then ask whether to file it and wait for an answer. Only once the maintainer
+approves, create it:
+
+```sh
+gh issue create --title "<title>" --label <label> --body-file <body>
+```
+
+Rules:
+
+- **Never file an issue without explicit approval.** A recommendation is not
+  an instruction.
+- **Never fix a deferred problem as a side effect of another task.** Keep the
+  change scoped to what was asked and propose the rest.
+- **One issue per problem.** Do not bundle unrelated findings together.
+- Use this repository's conventions: the title prefixes `[BUG]`, `[FEATURE]`,
+  `[DOCS]` and `[PERF]`, with the matching labels `bug`, `enhancement`,
+  `documentation` and `performance`.
+- **Check what is already tracked** before proposing. `gh issue list --state
+  all` and the "Known Issues" section of `docs/VERSION_MANAGEMENT.md` list
+  what is known. If a problem is already filed, refer to that issue instead
+  of proposing a new one, and update the "Known Issues" entry to point at it.
+- When a proposed issue is filed, record the issue number in the "Known
+  Issues" section of `docs/VERSION_MANAGEMENT.md` so it is not proposed
+  twice.
+
+## 5. Keep Dependencies in Sync
 
 If you add or update dependencies remember to:
 
@@ -185,7 +234,7 @@ If you add or update dependencies remember to:
 2. Run `cargo update` to update `Cargo.lock` with the latest compatible versions.
 3. Test the changes with `cargo run` to ensure everything still works.
 
-## 5. Coding Conventions
+## 6. Coding Conventions
 
 * Follow Rust naming conventions (snake_case for functions/variables, PascalCase for types).
 * Use `anyhow` for error handling and `Result<T>` return types.
@@ -194,21 +243,21 @@ If you add or update dependencies remember to:
 * Add appropriate logging with the `log` crate.
 * Write unit tests in the same file using `#[cfg(test)]` modules.
 
-## 6. Testing Guidelines
+## 7. Testing Guidelines
 
 * **Always run `cargo test` after making changes** to ensure existing functionality
   still works.
 * **Use `cargo test --verbose` for detailed test output** when debugging test failures.
 * **Write tests for new functionality** to maintain code quality.
 
-## 7. Configuration Management
+## 8. Configuration Management
 
 * Configuration files are stored in `~/.config/ai-cli/config.toml`.
 * Use the `toml` crate for configuration file parsing.
 * Provide sensible defaults in the `AppConfig::default()` implementation.
 * Allow command-line arguments to override configuration file settings.
 
-## 8. Useful Commands Recap
+## 9. Useful Commands Recap
 
 | Command                | Purpose                                            |
 | ---------------------- | -------------------------------------------------- |
@@ -222,7 +271,7 @@ If you add or update dependencies remember to:
 | `cargo build`          | Build the application in debug mode.               |
 | `cargo build --release`| **Release build – _use sparingly during development_** |
 
-## 9. Development Workflow
+## 10. Development Workflow
 
 1. **Make changes to the code**
 2. **Run `cargo check`** to verify syntax
@@ -233,14 +282,14 @@ If you add or update dependencies remember to:
 7. **Format with 'cargo fmt'** to maintain coding style
 8. **Open a pull request** against `development` and wait for review (see section 2)
 
-## 10. Logging and Debugging
+## 11. Logging and Debugging
 
 * Use the `log` crate for structured logging.
 * Set appropriate log levels: `trace`, `debug`, `info`, `warn`, `error`.
 * Use `-v` for debug logging, `-vv` for trace logging.
 * Log important operations and error conditions.
 
-## 11. Error Handling
+## 12. Error Handling
 
 * Use `anyhow::Result<T>` for functions that can fail.
 * Provide meaningful error messages with context.
