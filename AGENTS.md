@@ -10,6 +10,8 @@ the guidelines below so that the development experience continues to work smooth
   base.
 * **Create or update unit tests** for any code changes and always verify they are passing.
 * **Do _not_ create a PR** for any changes unless requested.
+* **Never merge into `development` or `main` without an explicit approval.** See
+  section 2, *Branch Protection and Review Requirements*.
 * **Update documentation** including README.md and markdown files in the 'docs' directory.
 * **Do _not_ update CHANGELOG.md** unless requested.
 * **Always use `cargo run` for testing the CLI application** while iterating on the
@@ -19,7 +21,65 @@ the guidelines below so that the development experience continues to work smooth
   needed for performance testing. The release build takes longer and may not be necessary
   for development iterations.
 
-## 2. Keep Dependencies in Sync
+## 2. Branch Protection and Review Requirements (Mandatory)
+
+The `development` and `main` branches are protected. These rules apply to every
+change, including changes made by an automated agent.
+
+### Protected branch rules
+
+| Branch       | Required review | Required check     | Merge style | Direct push |
+| ------------ | --------------- | ------------------ | ----------- | ----------- |
+| `development` | 1 approval      | `Test Development` | Squash only | Not allowed |
+| `main`       | 0 approvals     | `Test`             | Squash only | Not allowed |
+
+`enforce_admins` is enabled on `development`, so administrator privileges do
+**not** bypass the review requirement. Force pushes and branch deletion are
+disabled on both branches. Linear history is enforced on both, so merge
+commits are rejected.
+
+### What you must do
+
+1. **Never merge into `development` or `main` on your own initiative.** Open a
+   pull request, give the reviewer the link, and then stop and wait for an
+   explicit approval before merging.
+2. **Never modify branch protection to work around a merge failure.** If a pull
+   request cannot be merged because a review is missing, that is the system
+   working as intended. Report it and ask the maintainer to approve it, or to
+   relax the rule themselves if that is what they want.
+3. **Never delete, force-push, or otherwise rewrite a protected branch.**
+4. **Use squash merges.** Linear history is enforced, so `--merge` is rejected
+   by the API.
+5. **Do not close other people's pull requests** without being asked to.
+
+### Review hand-off
+
+When you open a pull request, include in the pull request body:
+
+* A summary of the change and the reason for it.
+* The verification you performed (tests, lints, formatting).
+* Any risk, trade-off, or follow-up work.
+
+Then post the pull request link to the maintainer and wait. Do not merge, do
+not push further commits to the branch, and do not start a new pull request
+against the same target while the first one is awaiting review.
+
+### Releasing
+
+`development` is the base for release work. Prepare the release on
+`development`, promote it to `main` through a pull request, and publish the
+release with a tag. The `Automate Release` workflow is currently unreliable
+because its commit step has nothing to commit when the version has already
+been bumped, and the `sync-version-and-tag` job in `release.yml` is
+unreachable because that workflow only triggers on `release: published`.
+Confirm the intended flow with the maintainer before cutting a release.
+
+`Sync Development Branch with Main` merges `main` into `development` on every
+push to `main`. It pushes directly to a protected branch, so it fails while
+branch protection is in place. If the branches have diverged, ask the
+maintainer to reconcile them rather than pushing to `development` yourself.
+
+## 3. Keep Dependencies in Sync
 
 If you add or update dependencies remember to:
 
@@ -27,7 +87,7 @@ If you add or update dependencies remember to:
 2. Run `cargo update` to update `Cargo.lock` with the latest compatible versions.
 3. Test the changes with `cargo run` to ensure everything still works.
 
-## 3. Coding Conventions
+## 4. Coding Conventions
 
 * Follow Rust naming conventions (snake_case for functions/variables, PascalCase for types).
 * Use `anyhow` for error handling and `Result<T>` return types.
@@ -36,21 +96,21 @@ If you add or update dependencies remember to:
 * Add appropriate logging with the `log` crate.
 * Write unit tests in the same file using `#[cfg(test)]` modules.
 
-## 4. Testing Guidelines
+## 5. Testing Guidelines
 
 * **Always run `cargo test` after making changes** to ensure existing functionality
   still works.
 * **Use `cargo test --verbose` for detailed test output** when debugging test failures.
 * **Write tests for new functionality** to maintain code quality.
 
-## 5. Configuration Management
+## 6. Configuration Management
 
 * Configuration files are stored in `~/.config/ai-cli/config.toml`.
 * Use the `toml` crate for configuration file parsing.
 * Provide sensible defaults in the `AppConfig::default()` implementation.
 * Allow command-line arguments to override configuration file settings.
 
-## 6. Useful Commands Recap
+## 7. Useful Commands Recap
 
 | Command                | Purpose                                            |
 | ---------------------- | -------------------------------------------------- |
@@ -64,7 +124,7 @@ If you add or update dependencies remember to:
 | `cargo build`          | Build the application in debug mode.               |
 | `cargo build --release`| **Release build – _use sparingly during development_** |
 
-## 7. Development Workflow
+## 8. Development Workflow
 
 1. **Make changes to the code**
 2. **Run `cargo check`** to verify syntax
@@ -73,15 +133,16 @@ If you add or update dependencies remember to:
 5. **Iterate as needed**
 6. **Lint with 'cargo clippy'** to enforce proper syntex
 7. **Format with 'cargo fmt'** to maintain coding style
+8. **Open a pull request** against `development` and wait for review (see section 2)
 
-## 8. Logging and Debugging
+## 9. Logging and Debugging
 
 * Use the `log` crate for structured logging.
 * Set appropriate log levels: `trace`, `debug`, `info`, `warn`, `error`.
 * Use `-v` for debug logging, `-vv` for trace logging.
 * Log important operations and error conditions.
 
-## 9. Error Handling
+## 10. Error Handling
 
 * Use `anyhow::Result<T>` for functions that can fail.
 * Provide meaningful error messages with context.

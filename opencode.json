@@ -19,7 +19,15 @@
   },
   "permissions": [
     { "action": "shell", "resource": "*git push*", "effect": "ask" },
-    { "action": "shell", "resource": "*gh pr create*", "effect": "ask" },
+    { "action": "shell", "resource": "*gh pr create*", "effect": "allow" },
+    { "action": "shell", "resource": "*gh pr merge*", "effect": "ask" },
+    { "action": "shell", "resource": "*gh pr close*", "effect": "ask" },
+    { "action": "shell", "resource": "*gh release create*", "effect": "ask" },
+    { "action": "shell", "resource": "*gh workflow run*", "effect": "ask" },
+    { "action": "shell", "resource": "*git push*origin development*", "effect": "deny" },
+    { "action": "shell", "resource": "*git push*origin main*", "effect": "deny" },
+    { "action": "shell", "resource": "*/branches/*/protection*", "effect": "deny" },
+    { "action": "shell", "resource": "*rulesets*", "effect": "deny" },
     { "action": "edit", "resource": "CHANGELOG.md", "effect": "ask" }
   ]
 }

@@ -38,14 +38,14 @@ See also: [shell_gpt](https://github.com/TheR1D/shell_gpt), [ai-shell](https://g
 
 ## Release Automation
 
-This repository includes a GitHub Actions workflow that automates releases end to end:
+Releases are prepared on the `development` branch, promoted to `main` through
+a pull request, and published with a tag. Publishing the release triggers the
+`Release` workflow, which verifies that the tag matches `Cargo.toml`, builds
+the release binary, and uploads the `tar.gz`, `zip`, and `deb` artifacts.
 
-- Validates the provided SemVer release version
-- Updates `Cargo.toml` and `Cargo.lock` to the requested version
-- Runs project validation checks in CI
-- Pushes the release commit and creates a GitHub release tag in the format `vX.X.X`
-
-Run the `Automate Release` workflow from the Actions tab with a SemVer version input (for example, `0.3.0`).
+An `Automate Release` workflow is also available for manual runs from the
+Actions tab with a SemVer version input (for example, `0.3.1`). It performs the
+version bump, validation checks, build, and publication in a single job.
 
 Current release: `v0.3.1`.
 

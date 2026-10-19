@@ -1,42 +1,82 @@
 # Version Management Guide
 
-This project uses an automated release workflow that keeps `Cargo.toml` and GitHub release tags in sync.
+This project keeps `Cargo.toml`, `Cargo.lock`, and GitHub release tags in sync.
+
+## Branch Protection and Review
+
+`development` and `main` are protected branches. See `AGENTS.md` for the full
+rules, which apply to every change including automated ones.
+
+| Branch       | Required review | Required check     | Merge style | Direct push |
+| ------------ | --------------- | ------------------ | ----------- | ----------- |
+| `development` | 1 approval      | `Test Development` | Squash only | Not allowed |
+| `main`       | 0 approvals     | `Test`             | Squash only | Not allowed |
+
+`enforce_admins` is enabled on `development`, so administrator privileges do
+not bypass the review requirement. A pull request into `development` is
+therefore reviewed by a human before it lands.
 
 ## Primary Release Workflow
 
-Use `.github/workflows/automate-release.yml` with `workflow_dispatch`.
+The release is prepared on `development`, promoted to `main` through a pull
+request, and then published with a tag.
 
-### What it automates
+### 1. Prepare the release on `development`
 
-1. Validates the provided version (`MAJOR.MINOR.PATCH`)
-2. Checks out main branch
-3. Updates `Cargo.toml` and refreshes `Cargo.lock`
-4. Commits and pushes version bump directly to main
-5. Builds release artifacts (binary, tar.gz, zip, deb)
-6. Creates a GitHub Release with tag `vX.X.X` and uploads artifacts
-7. GitHub release publication optionally triggers production workflows
+- Bump `version` in `Cargo.toml` and refresh `Cargo.lock` (`cargo check`).
+- Promote the `Unreleased` section of `CHANGELOG.md` to the new version.
+- Update the README release notes and the current release line.
 
-## Required Configuration
+### 2. Promote to `main`
 
-### Required repository settings
+- Open a pull request from `development` to `main`.
+- Wait for the required review, then merge with a squash merge.
 
-- GitHub Actions must have write access to contents.
-- main branch should allow direct commits from GitHub Actions (no PR required).
+### 3. Publish the release
 
-## How to Run a Release
+```sh
+gh release create vX.Y.Z --target main --title "vX.Y.Z" --generate-notes
+```
 
-1. Open **Actions** in GitHub.
-2. Run **Automate Release**.
-3. Provide `version` (example: `0.3.0`).
-4. Monitor the job until completion.
+Publishing the release triggers `.github/workflows/release.yml`. Its
+`Build and Release` job verifies that the tag version matches `Cargo.toml`,
+checks out a clean tree, builds the release binary, and uploads the `tar.gz`,
+`zip`, and `deb` artifacts to the release.
 
-Expected result:
+### 4. Verify
 
-- main branch `Cargo.toml` contains `version = "0.3.0"`
-- main branch is pushed with release commit
-- Release tag `v0.3.0` is created
-- GitHub release `v0.3.0` is published with artifacts (tar.gz, zip, deb)
-- Any dependent workflows trigger from the release event
+```sh
+gh release view vX.Y.Z --json assets
+gh run list --workflow release.yml --limit 1
+```
+
+The release should show three assets, and the `Release` workflow run should
+have completed successfully.
+
+## Automated Release Workflow
+
+`.github/workflows/automate-release.yml` can be run manually from the Actions
+tab with a `workflow_dispatch` `version` input. It validates the version,
+bumps `Cargo.toml` and `Cargo.lock`, commits and pushes to `main`, runs the
+test suite, builds the artifacts, and publishes the release in one job.
+
+**Limitation:** the workflow's commit step fails when `Cargo.toml` already
+contains the target version, because there is nothing left to commit. Use it
+only when `Cargo.toml` still holds the previous version, or use the primary
+workflow above.
+
+## Known Issues
+
+- **`sync-version-and-tag` in `release.yml` cannot run.** The workflow's only
+  trigger is `release: published`, so the `push` condition on that job is
+  unreachable. It has never created a version bump or a tag.
+- **`sync-development.yml` fails while branch protection is in place.** It
+  merges `main` into `development` by pushing directly to the protected
+  `development` branch, and GitHub rejects the push with `GH006`. If the
+  branches have diverged, the maintainer must reconcile them.
+- **Archive layouts differ.** The `tar.gz` contains a flat `ai-cli` binary
+  while the `zip` contains `artifacts/ai-cli`, because the workflow tars the
+  contents of `artifacts/` but zips the directory itself.
 
 ## Troubleshooting
 
@@ -66,6 +106,16 @@ Fix:
 - Allow GitHub Actions to push commits to main.
 - Or disable branch protection for Actions pushes on this workflow.
 
+### A pull request into `development` is blocked
+
+Cause: `development` requires one approving review, and `enforce_admins` is
+enabled.
+
+Fix:
+
+- Ask the maintainer to review and approve the pull request.
+- Do not modify the branch protection to work around this.
+
 ### Release binary shows `-dirty`
 
 Cause: Build metadata marked the tree as dirty at compile time.
@@ -87,8 +137,10 @@ Fix:
 
 If automation is blocked by policy:
 
-1. Manually update `Cargo.toml` version on main.
-2. Manually commit and push to main.
-3. Run `cargo build --release` and create artifacts.
-4. Create a GitHub release with tag `vX.X.X` and upload artifacts manually.
-
+1. Manually update `Cargo.toml` and `Cargo.lock` version on `main`.
+2. Manually commit and push to `main`.
+3. Publish the release with `gh release create`; the `Release` workflow builds
+   and uploads the artifacts.
+4. If the workflow cannot run, build the artifacts locally with
+   `cargo build --release` and `cargo deb --no-build`, then upload them with
+   `gh release upload`.
