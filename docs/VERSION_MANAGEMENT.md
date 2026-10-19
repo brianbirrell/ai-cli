@@ -10,10 +10,10 @@ rules, which apply to every change including automated ones.
 | Branch | Required checks | Approval | Merge style | Direct push |
 | --- | --- | --- | --- | --- |
 | `development` | `Test Development`, `Approved` | `approved` label | Squash or rebase | Not allowed |
-| `main` | `Test` | None | Squash or rebase | Not allowed |
+| `main` | `Test`, `Approved` | `approved` label | Rebase only | Not allowed |
 
-`development` is protected by a **ruleset** with no bypass actors, so it
-applies to repository administrators as well.
+Both branches are protected by a **ruleset** with no bypass actors, so they
+apply to repository administrators as well.
 
 ### How approval works
 
@@ -21,15 +21,15 @@ GitHub does not allow the author of a pull request to approve it, so a
 conventional "one approving review" rule can never be satisfied in a
 repository with a single maintainer. Instead, the owner signals approval by
 adding the `approved` label to the pull request. The `Approve Pull Request`
-workflow turns that label into the `Approved` status check, which the ruleset
-requires before the pull request can be merged. Removing the label revokes the
+workflow turns that label into the `Approved` status check, which the rulesets
+require before the pull request can be merged. Removing the label revokes the
 approval.
 
-The ruleset's `pull_request` rule has `required_approving_review_count` set to
+The rulesets' `pull_request` rule has `required_approving_review_count` set to
 `0`. That still requires every change to arrive through a pull request, which
 is what keeps direct pushes blocked for everyone, including administrators.
 
-The ruleset has no bypass actors, so an administrator cannot merge a pull
+The rulesets have no bypass actors, so an administrator cannot merge a pull
 request before the `Approved` check exists. The owner must act first.
 
 ## Primary Release Workflow

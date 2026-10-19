@@ -30,26 +30,26 @@ change, including changes made by an automated agent.
 
 ### Protected branch rules
 
-`development` is protected by a **ruleset**, not classic branch protection.
-`main` is protected by classic branch protection.
+Both `development` and `main` are protected by **rulesets**, not classic
+branch protection. Neither ruleset has bypass actors, so they apply to
+repository administrators as well.
 
-| Branch       | Required check     | Approval             | Merge style           | Direct push |
-| ------------ | ------------------ | -------------------- | --------------------- | ----------- |
-| `development` | `Test Development`, `Approved` | `approved` label | Squash or rebase      | Not allowed |
-| `main`       | `Test`             | None                 | Squash or rebase      | Not allowed |
+| Branch       | Required checks                | Approval      | Merge style      | Direct push |
+| ------------ | ------------------------------ | -------------- | ---------------- | ----------- |
+| `development` | `Test Development`, `Approved` | `approved` label | Squash or rebase | Not allowed |
+| `main`       | `Test`, `Approved`             | `approved` label | Rebase only      | Not allowed |
 
-The ruleset on `development` has **no bypass actors**, so it applies to
-repository administrators as well. The `pull_request` rule requires every
-change to arrive through a pull request, which keeps direct pushes blocked for
-everyone, and `required_approving_review_count` is `0` because GitHub does not
-allow the author of a pull request to approve their own.
+The `pull_request` rule on each ruleset has `required_approving_review_count`
+set to `0`. That still requires every change to arrive through a pull request,
+which is what keeps direct pushes blocked for everyone, including
+administrators.
 
 ### How approval works
 
 Because the pull request author cannot record an approval, the owner signals
 approval by adding the `approved` label to the pull request. The
 `Approve Pull Request` workflow turns that label into the `Approved` status
-check, which the ruleset requires. Removing the label revokes the approval.
+check, which the rulesets require. Removing the label revokes the approval.
 
 **Never add or remove the `approved` label.** It is the owner's action alone.
 The workflow is the only thing that may create the `Approved` check, and only
