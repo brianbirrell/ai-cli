@@ -30,10 +30,10 @@ change, including changes made by an automated agent.
 
 ### Protected branch rules
 
-| Branch       | Required review | Required check     | Merge style | Direct push |
-| ------------ | --------------- | ------------------ | ----------- | ----------- |
-| `development` | 1 approval      | `Test Development` | Squash only | Not allowed |
-| `main`       | 0 approvals     | `Test`             | Squash only | Not allowed |
+| Branch       | Required review | Required check     | Merge style           | Direct push |
+| ------------ | --------------- | ------------------ | --------------------- | ----------- |
+| `development` | 1 approval      | `Test Development` | Squash only           | Not allowed |
+| `main`       | 0 approvals     | `Test`             | Rebase, never squash  | Not allowed |
 
 `enforce_admins` is enabled on `development`, so administrator privileges do
 **not** bypass the review requirement. Force pushes and branch deletion are
@@ -50,8 +50,9 @@ commits are rejected.
    working as intended. Report it and ask the maintainer to approve it, or to
    relax the rule themselves if that is what they want.
 3. **Never delete, force-push, or otherwise rewrite a protected branch.**
-4. **Use squash merges.** Linear history is enforced, so `--merge` is rejected
-   by the API.
+4. **Use the merge style the target branch requires.** Linear history is
+   enforced on both, so `--merge` is rejected by the API. Squash into
+   `development`, rebase into `main`. See *Merge style for `main`*.
 5. **Do not close other people's pull requests** without being asked to.
 
 ### Review hand-off
@@ -66,6 +67,32 @@ Then post the pull request link to the maintainer and wait. Do not merge, do
 not push further commits to the branch, and do not start a new pull request
 against the same target while the first one is awaiting review.
 
+### Merge style for `main`
+
+`main` is merged back into `development` after every release by the
+`Sync Development Branch with Main` workflow. A squash merge would give `main`
+a new commit that has the same content as the commits on `development` but a
+different SHA. `development` would then hold the same change twice, joined by
+a merge commit, and the duplication would compound with every release.
+
+So merge `development` into `main` with a **rebase** merge:
+
+```sh
+gh pr merge <pr> --rebase
+```
+
+A rebase merge keeps the history linear, which `main` requires, and when
+`main` is a direct ancestor of `development` it fast-forwards, so `main` ends
+up holding the exact same commits with the same SHAs. The sync back to
+`development` is then a no-op.
+
+**Never use `--squash` for a `development` into `main` merge.** Squash merges
+are correct for pull requests from a feature branch into `development`, where
+the squashed commit is then carried across to `main` by the rebase.
+
+A merge commit would also preserve the commit SHAs, but `main` has
+`required_linear_history` enabled, so GitHub rejects merge commits there.
+
 ### Releasing
 
 `development` is the base for release work. Prepare the release on
@@ -79,7 +106,8 @@ The release preparation steps are:
    `cargo run --example generate_changelog -- <version>` (see section 3).
 3. Update the README release notes and the current release line.
 4. Commit on `development`, open a pull request to `main`, and wait for review.
-5. Merge the pull request with a squash merge.
+5. Merge the pull request with a **rebase** merge, never a squash merge (see
+   *Merge style for `main`*).
 6. Publish the release with
    `gh release create v<version> --target main --title "v<version>" --generate-notes`.
    Publishing triggers the `Release` workflow, which builds the artifacts and

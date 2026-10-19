@@ -51,7 +51,26 @@ request, and then published with a tag.
 ### 2. Promote to `main`
 
 - Open a pull request from `development` to `main`.
-- Wait for the required review, then merge with a squash merge.
+- Wait for the required review, then merge with a **rebase** merge:
+
+  ```sh
+  gh pr merge <pr> --rebase
+  ```
+
+  **Never squash this merge.** `main` is merged back into `development` after
+  every release by the `Sync Development Branch with Main` workflow. A squash
+  merge gives `main` a new commit with the same content but a different SHA,
+  so `development` would hold the same change twice, joined by a merge commit,
+  and the duplication would compound with every release.
+
+  A rebase merge keeps the history linear, which `main` requires, and when
+  `main` is a direct ancestor of `development` it fast-forwards, so `main`
+  holds the exact same commits with the same SHAs. The sync back to
+  `development` is then a no-op.
+
+  Squash merges remain correct for pull requests from a feature branch into
+  `development`, where the squashed commit is carried across to `main` by the
+  rebase.
 
 ### 3. Publish the release
 

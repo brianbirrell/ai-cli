@@ -65,8 +65,22 @@ into a WSL path before calling `rustfmt`.
 
 `development` and `main` are protected branches. `development` requires **one
 approving review** from someone with write access, and `enforce_admins` is on,
-so admin rights do not bypass it. Linear history is enforced, so squash merges
-are the only accepted merge style.
+so admin rights do not bypass it. Linear history is enforced on both branches,
+so merge commits are rejected and the merge style is what differs between them:
+
+- feature branch into `development` — squash (`gh pr merge <pr> --squash`)
+- `development` into `main` — rebase (`gh pr merge <pr> --rebase`)
+
+**Never squash a `development` into `main` merge.** `main` is merged back
+into `development` after every release by the `Sync Development Branch with
+Main` workflow. A squash merge gives `main` a new commit with the same content
+as the commits on `development` but a different SHA, so `development` ends up
+holding the same change twice, joined by a merge commit, and the duplication
+compounds with every release.
+
+A rebase merge keeps `main` linear and, when `main` is a direct ancestor of
+`development`, fast-forwards so that both branches hold the exact same commits
+with the same SHAs. The sync back to `development` is then a no-op.
 
 **Never merge into `development` or `main` on your own initiative.** The
 required flow is:
