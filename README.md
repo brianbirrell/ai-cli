@@ -23,6 +23,12 @@ A command-line OpenAI-compatible API client, written in Rust, for interacting wi
 
 See also: [shell_gpt](https://github.com/TheR1D/shell_gpt), [ai-shell](https://github.com/BuilderIO/ai-shell)
 
+## What Is New In v0.3.1
+
+- Switched the HTTP client to `rustls`, removing the `openssl` dependency and the system OpenSSL requirement
+- Updated dependencies for security, including `rustls-webpki` 0.103.15, resolving all open Dependabot security alerts
+- Updated `reqwest` to 0.13, `toml` to 1.1, `tokio` to 1.52, and `clap` to 4.6
+
 ## What Is New In v0.3.0
 
 - Added large-input chunked processing with configurable input modes (`off`, `chunked`, `auto`)
@@ -41,7 +47,7 @@ This repository includes a GitHub Actions workflow that automates releases end t
 
 Run the `Automate Release` workflow from the Actions tab with a SemVer version input (for example, `0.3.0`).
 
-Current release: `v0.3.0`.
+Current release: `v0.3.1`.
 
 For full details and required token/repo settings, see [docs/VERSION_MANAGEMENT.md](docs/VERSION_MANAGEMENT.md).
 
