@@ -1,0 +1,47 @@
+name: Approve Pull Request
+
+# Records the repository owner's approval of a pull request as a status check.
+#
+# The `development` branch is protected by a ruleset that requires a status
+# check named "Approved" before a pull request can be merged. GitHub does not
+# allow the author of a pull request to approve it, so the owner signals
+# approval by adding the `approved` label. This workflow turns that label into
+# the required check.
+#
+# Removing the label revokes the approval, because a later check run with the
+# same name replaces the earlier one for the commit.
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+    branches: [development]
+
+permissions:
+  pull-requests: write
+  checks: write
+  contents: read
+
+jobs:
+  approve:
+    name: Record approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the approval state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'approved') }}
+        run: |
+          if [ "$APPROVED" = "true" ]; then
+            conclusion="success"
+            summary="Approved by the repository owner."
+          else
+            conclusion="failure"
+            summary="The approval label was removed."
+          fi
+
+          printf '{"name":"Approved","head_sha":"%s","status":"completed","conclusion":"%s","output":{"title":"%s","summary":"%s"}}' \
+            "$SHA" "$conclusion" "$summary" "$summary" > /tmp/check.json
+
+          gh api -X POST "repos/${{ github.repository }}/check-runs" \
+            --input /tmp/check.json --jq '.conclusion'

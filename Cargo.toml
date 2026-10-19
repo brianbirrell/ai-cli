@@ -17,6 +17,13 @@ assets = [
 [build-dependencies]
 chrono = "0.4"
 
+# Development only tool that generates the CHANGELOG release section from the
+# commit history. Examples are not installed by `cargo install` and are not
+# built by `cargo build --release`, so this adds no shipped binary.
+[[example]]
+name = "generate_changelog"
+test = true
+
 [dependencies]
 tokio = { version = "1.52", features = ["full", "sync"] }
 reqwest = { version = "0.13", features = ["json", "stream"] }

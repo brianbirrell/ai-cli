@@ -1,42 +1,138 @@
 # Version Management Guide
 
-This project uses an automated release workflow that keeps `Cargo.toml` and GitHub release tags in sync.
+This project keeps `Cargo.toml`, `Cargo.lock`, and GitHub release tags in sync.
+
+## Branch Protection and Review
+
+`development` and `main` are protected branches. See `AGENTS.md` for the full
+rules, which apply to every change including automated ones.
+
+| Branch | Required checks | Approval | Merge style | Direct push |
+| --- | --- | --- | --- | --- |
+| `development` | `Test Development`, `Approved` | `approved` label | Squash or rebase | Not allowed |
+| `main` | `Test` | None | Squash or rebase | Not allowed |
+
+`development` is protected by a **ruleset** with no bypass actors, so it
+applies to repository administrators as well.
+
+### How approval works
+
+GitHub does not allow the author of a pull request to approve it, so a
+conventional "one approving review" rule can never be satisfied in a
+repository with a single maintainer. Instead, the owner signals approval by
+adding the `approved` label to the pull request. The `Approve Pull Request`
+workflow turns that label into the `Approved` status check, which the ruleset
+requires before the pull request can be merged. Removing the label revokes the
+approval.
+
+The ruleset's `pull_request` rule has `required_approving_review_count` set to
+`0`. That still requires every change to arrive through a pull request, which
+is what keeps direct pushes blocked for everyone, including administrators.
+
+The ruleset has no bypass actors, so an administrator cannot merge a pull
+request before the `Approved` check exists. The owner must act first.
 
 ## Primary Release Workflow
 
-Use `.github/workflows/automate-release.yml` with `workflow_dispatch`.
+The release is prepared on `development`, promoted to `main` through a pull
+request, and then published with a tag.
 
-### What it automates
+### 1. Prepare the release on `development`
 
-1. Validates the provided version (`MAJOR.MINOR.PATCH`)
-2. Checks out main branch
-3. Updates `Cargo.toml` and refreshes `Cargo.lock`
-4. Commits and pushes version bump directly to main
-5. Builds release artifacts (binary, tar.gz, zip, deb)
-6. Creates a GitHub Release with tag `vX.X.X` and uploads artifacts
-7. GitHub release publication optionally triggers production workflows
+- Bump `version` in `Cargo.toml` and refresh `Cargo.lock` (`cargo check`).
+- Generate the changelog section from the commit history:
 
-## Required Configuration
+  ```sh
+  cargo run --example generate_changelog -- 0.3.2
+  ```
 
-### Required repository settings
+  The generator reads the commits between the previous release tag and
+  `origin/development`, groups them by category, and rewrites the
+  `## Unreleased` section as `## <version> (<date>)`. It refuses to write an
+  empty section or to duplicate an existing version.
 
-- GitHub Actions must have write access to contents.
-- main branch should allow direct commits from GitHub Actions (no PR required).
+  Useful options: `--dry-run` to preview, `--from-tag` to override the
+  previous release tag, `--date` to set the release date, and `--branch` to
+  read history from a branch other than `origin/development`.
 
-## How to Run a Release
+  The generator is a cargo example, so it needs nothing beyond the Rust
+  toolchain and `git`. It is not installed by `cargo install` and is not part
+  of the release artifacts.
 
-1. Open **Actions** in GitHub.
-2. Run **Automate Release**.
-3. Provide `version` (example: `0.3.0`).
-4. Monitor the job until completion.
+  `CHANGELOG.md` is only touched here, when a release is being cut. It is not
+  updated for ordinary changes.
 
-Expected result:
+- Update the README release notes and the current release line.
 
-- main branch `Cargo.toml` contains `version = "0.3.0"`
-- main branch is pushed with release commit
-- Release tag `v0.3.0` is created
-- GitHub release `v0.3.0` is published with artifacts (tar.gz, zip, deb)
-- Any dependent workflows trigger from the release event
+### 2. Promote to `main`
+
+- Open a pull request from `development` to `main`.
+- Wait for the required review, then merge with a **rebase** merge:
+
+  ```sh
+  gh pr merge <pr> --rebase
+  ```
+
+  **Never squash this merge.** `main` is merged back into `development` after
+  every release by the `Sync Development Branch with Main` workflow. A squash
+  merge gives `main` a new commit with the same content but a different SHA,
+  so `development` would hold the same change twice, joined by a merge commit,
+  and the duplication would compound with every release.
+
+  A rebase merge keeps the history linear, which `main` requires, and when
+  `main` is a direct ancestor of `development` it fast-forwards, so `main`
+  holds the exact same commits with the same SHAs. The sync back to
+  `development` is then a no-op.
+
+  Squash merges remain correct for pull requests from a feature branch into
+  `development`, where the squashed commit is carried across to `main` by the
+  rebase.
+
+### 3. Publish the release
+
+```sh
+gh release create vX.Y.Z --target main --title "vX.Y.Z" --generate-notes
+```
+
+Publishing the release triggers `.github/workflows/release.yml`. Its
+`Build and Release` job verifies that the tag version matches `Cargo.toml`,
+checks out a clean tree, builds the release binary, and uploads the `tar.gz`,
+`zip`, and `deb` artifacts to the release.
+
+### 4. Verify
+
+```sh
+gh release view vX.Y.Z --json assets
+gh run list --workflow release.yml --limit 1
+```
+
+The release should show three assets, and the `Release` workflow run should
+have completed successfully.
+
+## Automated Release Workflow
+
+`.github/workflows/automate-release.yml` can be run manually from the Actions
+tab with a `workflow_dispatch` `version` input. It validates the version,
+bumps `Cargo.toml` and `Cargo.lock`, commits and pushes to `main`, runs the
+test suite, builds the artifacts, and publishes the release in one job.
+
+**Limitation:** the workflow's commit step fails when `Cargo.toml` already
+contains the target version, because there is nothing left to commit. Use it
+only when `Cargo.toml` still holds the previous version, or use the primary
+workflow above.
+
+## Known Issues
+
+- **`sync-version-and-tag` in `release.yml` cannot run.** The workflow's only
+  trigger is `release: published`, so the `push` condition on that job is
+  unreachable. It has never created a version bump or a tag.
+- **`sync-development.yml` fails while branch protection is in place.** It
+  merges `main` into `development` by pushing directly to the protected
+  `development` branch, and GitHub rejects the push with `GH006`. If the
+  branches have diverged, the maintainer must reconcile them.
+- **Archive layouts differ.** The `tar.gz` contains a flat `ai-cli` binary
+  while the `zip` contains `artifacts/ai-cli`, because the workflow tars the
+  contents of `artifacts/` but zips the directory itself.
 
 ## Troubleshooting
 
@@ -66,6 +162,18 @@ Fix:
 - Allow GitHub Actions to push commits to main.
 - Or disable branch protection for Actions pushes on this workflow.
 
+### A pull request into `development` is blocked
+
+Cause: the ruleset requires the `Approved` status check, which only exists once
+the maintainer has added the `approved` label. The `Test Development` check
+may also still be running.
+
+Fix:
+
+- Ask the maintainer to add the `approved` label to the pull request.
+- Wait for the `Approve Pull Request` workflow to publish the `Approved` check.
+- Do not modify the ruleset or the branch protection to work around this.
+
 ### Release binary shows `-dirty`
 
 Cause: Build metadata marked the tree as dirty at compile time.
@@ -87,8 +195,10 @@ Fix:
 
 If automation is blocked by policy:
 
-1. Manually update `Cargo.toml` version on main.
-2. Manually commit and push to main.
-3. Run `cargo build --release` and create artifacts.
-4. Create a GitHub release with tag `vX.X.X` and upload artifacts manually.
-
+1. Manually update `Cargo.toml` and `Cargo.lock` version on `main`.
+2. Manually commit and push to `main`.
+3. Publish the release with `gh release create`; the `Release` workflow builds
+   and uploads the artifacts.
+4. If the workflow cannot run, build the artifacts locally with
+   `cargo build --release` and `cargo deb --no-build`, then upload them with
+   `gh release upload`.
