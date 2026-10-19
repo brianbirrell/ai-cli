@@ -116,20 +116,35 @@ tab with a `workflow_dispatch` `version` input. It validates the version,
 bumps `Cargo.toml` and `Cargo.lock`, commits and pushes to `main`, runs the
 test suite, builds the artifacts, and publishes the release in one job.
 
-**Limitation:** the workflow's commit step fails when `Cargo.toml` already
-contains the target version, because there is nothing left to commit. Use it
-only when `Cargo.toml` still holds the previous version, or use the primary
-workflow above.
+**It is currently unusable, and the manual flow above is the supported path.**
+Two independent reasons:
+
+1. Its commit step fails when `Cargo.toml` already contains the target
+   version, because there is nothing left to commit.
+2. It pushes the version bump directly to `main`, and the `main` ruleset
+   requires every change to arrive through a pull request.
+
+## Syncing `main` back into `development`
+
+`Sync Development Branch with Main` runs on every push to `main`. It does not
+need the owner's approval, and does not need one in practice. `main` can only
+change through a rebase merge from `development`, and a rebase merge of an
+ancestor fast-forwards and preserves commit ids. So `main` is always an
+ancestor of `development`, the workflow finds nothing to merge, and it never
+pushes.
+
+The workflow verifies that invariant and fails with an actionable message if
+the branches ever diverge. A back merge could not be pushed in any case: the
+`development` ruleset blocks direct pushes, and `required_linear_history`
+forbids the merge commit the previous version of the workflow would have
+created.
 
 ## Known Issues
 
 - **`sync-version-and-tag` in `release.yml` cannot run.** The workflow's only
   trigger is `release: published`, so the `push` condition on that job is
   unreachable. It has never created a version bump or a tag.
-- **`sync-development.yml` fails while branch protection is in place.** It
-  merges `main` into `development` by pushing directly to the protected
-  `development` branch, and GitHub rejects the push with `GH006`. If the
-  branches have diverged, the maintainer must reconcile them.
+- **`automate-release.yml` cannot push to `main`.** See the section above.
 - **Archive layouts differ.** The `tar.gz` contains a flat `ai-cli` binary
   while the `zip` contains `artifacts/ai-cli`, because the workflow tars the
   contents of `artifacts/` but zips the directory itself.
