@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## Unreleased
+
+Security:
+  - Switched the HTTP client from `native-tls`/`openssl` to `rustls`, clearing 8 open `openssl` Dependabot advisories and removing the system OpenSSL dependency
+  - Updated `rustls-webpki` to 0.103.15, resolving the high severity denial of service advisory on malformed CRL BIT STRINGs -> [GHSA-82j2-j2ch-gfr8](https://github.com/advisories/GHSA-82j2-j2ch-gfr8)
+  - Updated `rand` to 0.10.3, resolving the unsoundness advisory affecting custom loggers -> [GHSA-cq8v-f236-94qc](https://github.com/advisories/GHSA-cq8v-f236-94qc)
+
+Dependencies:
+  - Updated `reqwest` from 0.12 to 0.13 -> [#91](https://github.com/brianbirrell/ai-cli/pull/91)
+  - Updated `toml` from 0.9 to 1.1 -> [#92](https://github.com/brianbirrell/ai-cli/pull/92)
+  - Updated `tokio` from 1.47 to 1.52 -> [#90](https://github.com/brianbirrell/ai-cli/pull/90)
+  - Updated `clap` from 4.5 to 4.6 -> [#89](https://github.com/brianbirrell/ai-cli/pull/89)
+  - Updated `rand` from 0.9 to 0.10 -> [#88](https://github.com/brianbirrell/ai-cli/pull/88)
+  - Updated `rustls` to 0.23.46 and `rustls-webpki` to 0.103.15
+
+Documentation:
+  - Dropped the `libssl-dev` prerequisite now that the build no longer links system OpenSSL
+
 ## 0.3.0 (2026-03-23)
 
 Features:

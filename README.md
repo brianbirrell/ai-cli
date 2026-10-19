@@ -55,8 +55,10 @@ For full details and required token/repo settings, see [docs/VERSION_MANAGEMENT.
   
   ```sh
   sudo apt update
-  sudo apt install build-essential libssl-dev pkg-config
+  sudo apt install build-essential pkg-config
   ```
+  
+  The HTTP client uses `rustls`, so a system OpenSSL installation is not required.
   
 
 ## Install
