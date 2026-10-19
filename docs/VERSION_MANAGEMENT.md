@@ -7,14 +7,30 @@ This project keeps `Cargo.toml`, `Cargo.lock`, and GitHub release tags in sync.
 `development` and `main` are protected branches. See `AGENTS.md` for the full
 rules, which apply to every change including automated ones.
 
-| Branch       | Required review | Required check     | Merge style | Direct push |
-| ------------ | --------------- | ------------------ | ----------- | ----------- |
-| `development` | 1 approval      | `Test Development` | Squash only | Not allowed |
-| `main`       | 0 approvals     | `Test`             | Squash only | Not allowed |
+| Branch | Required checks | Approval | Merge style | Direct push |
+| --- | --- | --- | --- | --- |
+| `development` | `Test Development`, `Approved` | `approved` label | Squash or rebase | Not allowed |
+| `main` | `Test` | None | Squash or rebase | Not allowed |
 
-`enforce_admins` is enabled on `development`, so administrator privileges do
-not bypass the review requirement. A pull request into `development` is
-therefore reviewed by a human before it lands.
+`development` is protected by a **ruleset** with no bypass actors, so it
+applies to repository administrators as well.
+
+### How approval works
+
+GitHub does not allow the author of a pull request to approve it, so a
+conventional "one approving review" rule can never be satisfied in a
+repository with a single maintainer. Instead, the owner signals approval by
+adding the `approved` label to the pull request. The `Approve Pull Request`
+workflow turns that label into the `Approved` status check, which the ruleset
+requires before the pull request can be merged. Removing the label revokes the
+approval.
+
+The ruleset's `pull_request` rule has `required_approving_review_count` set to
+`0`. That still requires every change to arrive through a pull request, which
+is what keeps direct pushes blocked for everyone, including administrators.
+
+The ruleset has no bypass actors, so an administrator cannot merge a pull
+request before the `Approved` check exists. The owner must act first.
 
 ## Primary Release Workflow
 
@@ -148,13 +164,15 @@ Fix:
 
 ### A pull request into `development` is blocked
 
-Cause: `development` requires one approving review, and `enforce_admins` is
-enabled.
+Cause: the ruleset requires the `Approved` status check, which only exists once
+the maintainer has added the `approved` label. The `Test Development` check
+may also still be running.
 
 Fix:
 
-- Ask the maintainer to review and approve the pull request.
-- Do not modify the branch protection to work around this.
+- Ask the maintainer to add the `approved` label to the pull request.
+- Wait for the `Approve Pull Request` workflow to publish the `Approved` check.
+- Do not modify the ruleset or the branch protection to work around this.
 
 ### Release binary shows `-dirty`
 

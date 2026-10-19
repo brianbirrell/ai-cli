@@ -30,25 +30,40 @@ change, including changes made by an automated agent.
 
 ### Protected branch rules
 
-| Branch       | Required review | Required check     | Merge style           | Direct push |
-| ------------ | --------------- | ------------------ | --------------------- | ----------- |
-| `development` | 1 approval      | `Test Development` | Squash only           | Not allowed |
-| `main`       | 0 approvals     | `Test`             | Rebase, never squash  | Not allowed |
+`development` is protected by a **ruleset**, not classic branch protection.
+`main` is protected by classic branch protection.
 
-`enforce_admins` is enabled on `development`, so administrator privileges do
-**not** bypass the review requirement. Force pushes and branch deletion are
-disabled on both branches. Linear history is enforced on both, so merge
-commits are rejected.
+| Branch       | Required check     | Approval             | Merge style           | Direct push |
+| ------------ | ------------------ | -------------------- | --------------------- | ----------- |
+| `development` | `Test Development`, `Approved` | `approved` label | Squash or rebase      | Not allowed |
+| `main`       | `Test`             | None                 | Squash or rebase      | Not allowed |
+
+The ruleset on `development` has **no bypass actors**, so it applies to
+repository administrators as well. The `pull_request` rule requires every
+change to arrive through a pull request, which keeps direct pushes blocked for
+everyone, and `required_approving_review_count` is `0` because GitHub does not
+allow the author of a pull request to approve their own.
+
+### How approval works
+
+Because the pull request author cannot record an approval, the owner signals
+approval by adding the `approved` label to the pull request. The
+`Approve Pull Request` workflow turns that label into the `Approved` status
+check, which the ruleset requires. Removing the label revokes the approval.
+
+**Never add or remove the `approved` label.** It is the owner's action alone.
+The workflow is the only thing that may create the `Approved` check, and only
+in response to the owner adding the label.
 
 ### What you must do
 
 1. **Never merge into `development` or `main` on your own initiative.** Open a
    pull request, give the reviewer the link, and then stop and wait for an
    explicit approval before merging.
-2. **Never modify branch protection to work around a merge failure.** If a pull
-   request cannot be merged because a review is missing, that is the system
-   working as intended. Report it and ask the maintainer to approve it, or to
-   relax the rule themselves if that is what they want.
+2. **Never modify branch protection or rulesets to work around a merge
+   failure.** If a pull request cannot be merged because a review or an
+   approval is missing, that is the system working as intended. Report it and
+   ask the owner to approve.
 3. **Never delete, force-push, or otherwise rewrite a protected branch.**
 4. **Use the merge style the target branch requires.** Linear history is
    enforced on both, so `--merge` is rejected by the API. Squash into
@@ -66,6 +81,9 @@ When you open a pull request, include in the pull request body:
 Then post the pull request link to the maintainer and wait. Do not merge, do
 not push further commits to the branch, and do not start a new pull request
 against the same target while the first one is awaiting review.
+
+The maintainer approves by adding the `approved` label. Once the `Approved`
+check is green the pull request can be merged.
 
 ### Merge style for `main`
 

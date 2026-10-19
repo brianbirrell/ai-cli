@@ -63,10 +63,10 @@ into a WSL path before calling `rustfmt`.
 
 ## Review workflow (mandatory)
 
-`development` and `main` are protected branches. `development` requires **one
-approving review** from someone with write access, and `enforce_admins` is on,
-so admin rights do not bypass it. Linear history is enforced on both branches,
-so merge commits are rejected and the merge style is what differs between them:
+`development` and `main` are protected branches. `development` is protected by
+a **ruleset** with no bypass actors, so it applies to administrators too.
+Linear history is enforced on both branches, so merge commits are rejected and
+the merge style is what differs between them:
 
 - feature branch into `development` — squash (`gh pr merge <pr> --squash`)
 - `development` into `main` — rebase (`gh pr merge <pr> --rebase`)
@@ -89,13 +89,21 @@ required flow is:
 2. Push the branch.
 3. Open a pull request against `development`.
 4. Post the pull request link to the maintainer.
-5. **Stop and wait** for an explicit approval before merging.
+5. **Stop and wait** for the maintainer to add the `approved` label.
+6. Merge only once the `Approved` check is green and the maintainer has asked
+   you to merge.
+
+**Never add or remove the `approved` label.** GitHub does not allow the
+author of a pull request to approve it, so the maintainer signals approval by
+adding that label, and the `Approve Pull Request` workflow turns it into the
+`Approved` status check the ruleset requires. Removing the label revokes the
+approval. Adding the label is the maintainer's action alone.
 
 Also:
 
-- **Never modify branch protection** to get past a merge failure. If a pull
-  request is blocked for want of a review, that is correct behaviour — report
-  it and let the maintainer approve.
+- **Never modify branch protection or rulesets** to get past a merge failure.
+  If a pull request is blocked for want of a review or an approval, that is
+  correct behaviour — report it and let the maintainer approve.
 - **Never push directly to `development` or `main`**, and never force-push or
   delete them.
 - **Never close someone else's pull request** unprompted.
