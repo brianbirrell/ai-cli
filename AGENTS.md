@@ -137,10 +137,13 @@ step has nothing to commit when the version has already been bumped, and the
 workflow only triggers on `release: published`. Confirm the intended flow with
 the maintainer before cutting a release.
 
-`Sync Development Branch with Main` merges `main` into `development` on every
-push to `main`. It pushes directly to a protected branch, so it fails while
-branch protection is in place. If the branches have diverged, ask the
-maintainer to reconcile them rather than pushing to `development` yourself.
+`Sync Development Branch with Main` runs on every push to `main`. It does
+**not** need the owner's approval, and does not need one in practice: `main`
+can only change through a rebase merge from `development`, which preserves
+commit ids, so `main` is always an ancestor of `development` and the workflow
+finds nothing to merge. It verifies that invariant and fails with an
+actionable message if the branches ever diverge. The `development` ruleset
+blocks direct pushes, so the workflow never pushes either.
 
 ## 3. Changelog
 

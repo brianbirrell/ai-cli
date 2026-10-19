@@ -34,17 +34,30 @@ jobs:
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git fetch origin main
-          git merge origin/main --no-edit || {
-            # If merge fails due to conflicts, resolve by taking main branch version
-            git status --porcelain | grep "^UU" | cut -c4- | xargs -I {} git checkout --theirs {}
-            git add .
-            git commit -m "Auto-resolve merge conflicts by taking main branch version"
-          }
-          git push origin development
+
+          # main can only change through a rebase merge from development, which
+          # preserves commit ids, so main is always an ancestor of development
+          # and there is nothing to merge back. The ruleset on development
+          # blocks direct pushes anyway, so a back merge cannot be pushed.
+          #
+          # This job therefore verifies the invariant and fails loudly, with an
+          # actionable message, if it is ever broken.
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "development already contains main. Nothing to sync."
+            echo "sync_status=not-needed" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "::error::main has commits that development does not have."
+          echo "::error::main can only change through a rebase merge from development,"
+          echo "::error::which preserves commit ids, so main should always be an"
+          echo "::error::ancestor of development. The branches have diverged."
+          echo "::error::Reconcile them by hand before promoting or releasing."
+          exit 1
 
       - name: Create sync summary
         run: |
           echo "## Development Branch Sync Summary" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Successfully synced development branch with main" >> $GITHUB_STEP_SUMMARY
+          echo "✅ development already contains main. No sync was needed." >> $GITHUB_STEP_SUMMARY
           echo "🕐 Sync completed at: $(date)" >> $GITHUB_STEP_SUMMARY
           echo "📝 Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
