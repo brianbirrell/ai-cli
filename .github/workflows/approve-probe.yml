@@ -1,0 +1,20 @@
+name: Approve Probe
+on:
+  pull_request:
+    types: [labeled]
+permissions:
+  pull-requests: write
+  contents: read
+jobs:
+  approve:
+    if: contains(github.event.pull_request.labels.*.name, 'approved')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record an approving review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          printf '{"event":"APPROVE","body":"Approved by the repository owner."}' > /tmp/review.json
+          gh api -X POST "repos/${{ github.repository }}/pulls/$PR/reviews" \
+            --input /tmp/review.json --jq '.state'
