@@ -1,6 +1,6 @@
 # CHANGELOG.md
 
-## Unreleased
+## 0.3.1 (2026-10-19)
 
 Security:
   - Switched the HTTP client from `native-tls`/`openssl` to `rustls`, clearing 8 open `openssl` Dependabot advisories and removing the system OpenSSL dependency
