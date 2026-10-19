@@ -13,7 +13,8 @@ the guidelines below so that the development experience continues to work smooth
 * **Never merge into `development` or `main` without an explicit approval.** See
   section 2, *Branch Protection and Review Requirements*.
 * **Update documentation** including README.md and markdown files in the 'docs' directory.
-* **Do _not_ update CHANGELOG.md** unless requested.
+* **Do _not_ update CHANGELOG.md** unless a release is being prepared, and then
+  only by running `scripts/generate_changelog.py`. See section 3, *Changelog*.
 * **Always use `cargo run` for testing the CLI application** while iterating on the
   code. This ensures proper dependency resolution and incremental compilation.
 * **Use `cargo check` for quick syntax checking** without full compilation.
@@ -68,18 +69,60 @@ against the same target while the first one is awaiting review.
 
 `development` is the base for release work. Prepare the release on
 `development`, promote it to `main` through a pull request, and publish the
-release with a tag. The `Automate Release` workflow is currently unreliable
-because its commit step has nothing to commit when the version has already
-been bumped, and the `sync-version-and-tag` job in `release.yml` is
-unreachable because that workflow only triggers on `release: published`.
-Confirm the intended flow with the maintainer before cutting a release.
+release with a tag.
+
+The release preparation steps are:
+
+1. Bump `version` in `Cargo.toml` and refresh `Cargo.lock` with `cargo check`.
+2. Generate the changelog section with
+   `python3 scripts/generate_changelog.py <version>` (see section 3).
+3. Update the README release notes and the current release line.
+4. Commit on `development`, open a pull request to `main`, and wait for review.
+5. Merge the pull request with a squash merge.
+6. Publish the release with
+   `gh release create v<version> --target main --title "v<version>" --generate-notes`.
+   Publishing triggers the `Release` workflow, which builds the artifacts and
+   uploads them.
+
+The `Automate Release` workflow is currently unreliable because its commit
+step has nothing to commit when the version has already been bumped, and the
+`sync-version-and-tag` job in `release.yml` is unreachable because that
+workflow only triggers on `release: published`. Confirm the intended flow with
+the maintainer before cutting a release.
 
 `Sync Development Branch with Main` merges `main` into `development` on every
 push to `main`. It pushes directly to a protected branch, so it fails while
 branch protection is in place. If the branches have diverged, ask the
 maintainer to reconcile them rather than pushing to `development` yourself.
 
-## 3. Keep Dependencies in Sync
+## 3. Changelog
+
+`CHANGELOG.md` is **generated, not written by hand**.
+
+* **When a release is being prepared**, update `CHANGELOG.md` by running the
+  generator, which derives the release section from the commit history of the
+  `development` branch:
+
+  ```sh
+  python3 scripts/generate_changelog.py <version>
+  ```
+
+  The generator reads the commits between the previous release tag and
+  `origin/development`, groups them by category, and rewrites the `## Unreleased`
+  section as `## <version> (<date>)`. Use `--dry-run` to preview and
+  `--from-tag` if the previous release tag needs overriding. It refuses to
+  write an empty section or to duplicate an existing version.
+
+* **At all other times, do not touch `CHANGELOG.md`.** It is not updated for
+  ordinary changes, documentation updates, dependency bumps, or pull request
+  work. It changes only when a release is cut.
+
+Entries link to the pull request when the commit subject carries a `(#NNN)`
+reference, and to the commit otherwise. The generator is the single source of
+truth, so a hand written entry that it does not produce will be lost on the
+next release.
+
+## 4. Keep Dependencies in Sync
 
 If you add or update dependencies remember to:
 
@@ -87,7 +130,7 @@ If you add or update dependencies remember to:
 2. Run `cargo update` to update `Cargo.lock` with the latest compatible versions.
 3. Test the changes with `cargo run` to ensure everything still works.
 
-## 4. Coding Conventions
+## 5. Coding Conventions
 
 * Follow Rust naming conventions (snake_case for functions/variables, PascalCase for types).
 * Use `anyhow` for error handling and `Result<T>` return types.
@@ -96,21 +139,21 @@ If you add or update dependencies remember to:
 * Add appropriate logging with the `log` crate.
 * Write unit tests in the same file using `#[cfg(test)]` modules.
 
-## 5. Testing Guidelines
+## 6. Testing Guidelines
 
 * **Always run `cargo test` after making changes** to ensure existing functionality
   still works.
 * **Use `cargo test --verbose` for detailed test output** when debugging test failures.
 * **Write tests for new functionality** to maintain code quality.
 
-## 6. Configuration Management
+## 7. Configuration Management
 
 * Configuration files are stored in `~/.config/ai-cli/config.toml`.
 * Use the `toml` crate for configuration file parsing.
 * Provide sensible defaults in the `AppConfig::default()` implementation.
 * Allow command-line arguments to override configuration file settings.
 
-## 7. Useful Commands Recap
+## 8. Useful Commands Recap
 
 | Command                | Purpose                                            |
 | ---------------------- | -------------------------------------------------- |
@@ -124,7 +167,7 @@ If you add or update dependencies remember to:
 | `cargo build`          | Build the application in debug mode.               |
 | `cargo build --release`| **Release build – _use sparingly during development_** |
 
-## 8. Development Workflow
+## 9. Development Workflow
 
 1. **Make changes to the code**
 2. **Run `cargo check`** to verify syntax
@@ -135,14 +178,14 @@ If you add or update dependencies remember to:
 7. **Format with 'cargo fmt'** to maintain coding style
 8. **Open a pull request** against `development` and wait for review (see section 2)
 
-## 9. Logging and Debugging
+## 10. Logging and Debugging
 
 * Use the `log` crate for structured logging.
 * Set appropriate log levels: `trace`, `debug`, `info`, `warn`, `error`.
 * Use `-v` for debug logging, `-vv` for trace logging.
 * Log important operations and error conditions.
 
-## 10. Error Handling
+## 11. Error Handling
 
 * Use `anyhow::Result<T>` for functions that can fail.
 * Provide meaningful error messages with context.

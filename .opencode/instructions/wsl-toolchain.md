@@ -37,8 +37,29 @@ into a WSL path before calling `rustfmt`.
 - Branch from `development`; never work directly on `main`.
 - Do **not** run `cargo build --release` unless a release build is actually needed.
 - Update `README.md` and `docs/` alongside code changes.
-- Leave `CHANGELOG.md` alone unless it is explicitly requested.
+- Leave `CHANGELOG.md` alone unless a release is being prepared, and then
+  only by running the generator. See the changelog policy below.
 - Do not create a pull request unless it is explicitly requested.
+
+## Changelog policy
+
+`CHANGELOG.md` is **generated, not written by hand**.
+
+- **Only** update it when the user asks for a release. Do not touch it for
+  ordinary changes, documentation updates, dependency bumps, or pull request
+  work.
+- When a release is requested, generate the section rather than writing it:
+
+  ```sh
+  python3 scripts/generate_changelog.py <version>
+  ```
+
+  It reads the commits between the previous release tag and `origin/development`,
+  groups them by category, and rewrites the `## Unreleased` section as
+  `## <version> (<date>)`. Use `--dry-run` to preview first.
+
+- Do not add entries by hand. The generator is the single source of truth, so
+  a hand written entry will be lost on the next release.
 
 ## Review workflow (mandatory)
 

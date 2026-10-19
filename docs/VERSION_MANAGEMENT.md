@@ -24,7 +24,24 @@ request, and then published with a tag.
 ### 1. Prepare the release on `development`
 
 - Bump `version` in `Cargo.toml` and refresh `Cargo.lock` (`cargo check`).
-- Promote the `Unreleased` section of `CHANGELOG.md` to the new version.
+- Generate the changelog section from the commit history:
+
+  ```sh
+  python3 scripts/generate_changelog.py 0.3.2
+  ```
+
+  The generator reads the commits between the previous release tag and
+  `origin/development`, groups them by category, and rewrites the
+  `## Unreleased` section as `## <version> (<date>)`. It refuses to write an
+  empty section or to duplicate an existing version.
+
+  Useful options: `--dry-run` to preview, `--from-tag` to override the
+  previous release tag, `--date` to set the release date, and `--ref` to read
+  history from a branch other than `origin/development`.
+
+  `CHANGELOG.md` is only touched here, when a release is being cut. It is not
+  updated for ordinary changes.
+
 - Update the README release notes and the current release line.
 
 ### 2. Promote to `main`

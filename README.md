@@ -47,6 +47,10 @@ An `Automate Release` workflow is also available for manual runs from the
 Actions tab with a SemVer version input (for example, `0.3.1`). It performs the
 version bump, validation checks, build, and publication in a single job.
 
+The changelog for a release is generated from the commit history of the
+`development` branch with `scripts/generate_changelog.py`, so it always matches
+the commits it describes.
+
 Current release: `v0.3.1`.
 
 For full details and required token/repo settings, see [docs/VERSION_MANAGEMENT.md](docs/VERSION_MANAGEMENT.md).
